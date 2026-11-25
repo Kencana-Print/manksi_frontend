@@ -552,7 +552,7 @@ const kainBerlebih = computed(() => totalKain.value > batasKain.value);
 const labelApproval = computed(() => {
   const h = formData.value.header;
   if (h.apvStatus === "W") {
-    return "Menunggu approval SPV/Manager";
+    return "Menunggu approval SPV";
   }
   if (h.apvStatus === "Y") {
     return `Disetujui ${h.apvUser} (${h.apvTgl})`;
@@ -789,8 +789,8 @@ const tutupSetelahSimpan = () => {
         <div class="sep" />
 
         <div class="fr">
-          <label class="lbl" title="Jumlah Output Produksi semua baris">
-            Akumulasi Total
+          <label class="lbl" title="Jumlah Output Produksi (meter) semua baris">
+            Akumulasi Total (m)
           </label>
           <input
             :value="fmt2(akumulasiTotal)"
@@ -814,18 +814,18 @@ const tutupSetelahSimpan = () => {
             </button>
           </div>
           <div class="tbl-wrap" style="max-height: 260px; min-height: 110px">
-            <table class="gt" style="min-width: 960px">
+            <table class="gt" style="min-width: 980px">
               <thead>
                 <tr>
                   <th style="width: 32px" class="tc">No</th>
                   <th style="width: 160px">Nomor SPK</th>
                   <th style="width: 220px">Nama Order</th>
-                  <th style="width: 80px" class="tr">Jml Order</th>
-                  <th style="width: 65px" class="tr">Panjang</th>
-                  <th style="width: 65px" class="tr">Lebar</th>
-                  <th style="width: 85px" class="tr bg-yellow">J. Cetak</th>
+                  <th style="width: 90px" class="tr">Jml Order (pcs)</th>
+                  <th style="width: 70px" class="tr">Panjang (m)</th>
+                  <th style="width: 70px" class="tr">Lebar (m)</th>
+                  <th style="width: 90px" class="tr bg-yellow">J. Cetak (pcs)</th>
                   <th style="width: 95px" class="tr bg-yellow">J. Plangkan</th>
-                  <th style="width: 110px" class="tr">Output Produksi</th>
+                  <th style="width: 120px" class="tr">Output Produksi (m)</th>
                   <th style="width: 32px" class="tc"></th>
                 </tr>
               </thead>
@@ -1005,7 +1005,7 @@ const tutupSetelahSimpan = () => {
           Kebutuhan {{ fmt2(kebutuhanKain) }} m · Batas (+2,5%)
           {{ fmt2(batasKain) }} m
           <template v-if="kainBerlebih">
-            · Melebihi batas: LHK menunggu approval SPV/Manager
+            · Melebihi batas: LHK menunggu approval SPV
           </template>
         </div>
 
@@ -1108,7 +1108,7 @@ const tutupSetelahSimpan = () => {
           LHK Cetak <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
         <div v-if="menungguApproval" class="text-body-2 text-warning mb-2">
-          LHK ini menunggu approval SPV/Manager karena pemakaian kain melebihi
+          LHK ini menunggu approval SPV karena pemakaian kain melebihi
           kebutuhan dan belum aktif sebelum disetujui.
         </div>
         <div class="text-body-2 text-grey-darken-1">

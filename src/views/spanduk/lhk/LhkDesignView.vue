@@ -16,7 +16,8 @@ import type {
   LhkDesignStatusRow,
 } from "@/services/spanduk/lhk/lhkDesignService";
 import { IconSkull, IconFileExport } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
+import TanggalInput from "@/components/TanggalInput.vue";
 
 interface ExportMasterRow {
   Nomor_LHK: string;
@@ -126,11 +127,16 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "No. LHK", key: "Nomor_LHK", width: "150px" },
   { title: "Nomor SPK/MAP", key: "Nomor", width: "170px" },
-  { title: "Nama SPK", key: "Nama_SPK", width: "280px" },
+  {
+    title: "Nama SPK",
+    key: "Nama_SPK",
+    width: "280px",
+    cellProps: { class: "col-nama-spk" },
+  },
   { title: "Tgl SPK", key: "Tanggal_SPK", width: "110px", align: "center" },
   { title: "Dateline", key: "Dateline", width: "110px", align: "center" },
   { title: "Tgl LHK", key: "Tanggal_LHK", width: "110px", align: "center" },
-  { title: "Status Terakhir", key: "Status_Terakhir", width: "140px" },
+  { title: "Status", key: "Status_Terakhir", width: "130px" },
   { title: "User", key: "User_Create", width: "100px" },
 ];
 
@@ -143,7 +149,7 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Tgl SPK", key: "Tanggal_SPK", width: 14, align: "center" },
   { header: "Dateline", key: "Dateline", width: 14, align: "center" },
   { header: "Tgl LHK", key: "Tanggal_LHK", width: 14, align: "center" },
-  { header: "Status Terakhir", key: "Status_Terakhir", width: 18 },
+  { header: "Status", key: "Status_Terakhir", width: 18 },
   { header: "User", key: "User_Create", width: 12 },
 ];
 
@@ -190,7 +196,7 @@ const dataTampil = (): LhkDesignRow[] =>
 const preLinesExport = () => [
   { text: "LHK Design", bold: true, size: 12, color: "1565C0" },
   {
-    text: `Periode ${formatTanggal(filterState.value.dtAwal)} - ${formatTanggal(filterState.value.dtAkhir)}`,
+    text: `Periode ${formatTanggalSingkat(filterState.value.dtAwal)} - ${formatTanggalSingkat(filterState.value.dtAkhir)}`,
     bold: true,
   },
   { text: "" },
@@ -271,9 +277,9 @@ const exportMaster = async () => {
             Nomor_LHK: r.Nomor_LHK ?? "",
             Nomor: r.Nomor,
             Nama_SPK: r.Nama_SPK ?? "",
-            Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
-            Dateline: formatTanggal(r.Dateline),
-            Tanggal_LHK: formatTanggal(r.Tanggal_LHK),
+            Tanggal_SPK: formatTanggalSingkat(r.Tanggal_SPK),
+            Dateline: formatTanggalSingkat(r.Dateline),
+            Tanggal_LHK: formatTanggalSingkat(r.Tanggal_LHK),
             Status_Terakhir: r.Status_Terakhir ?? "",
             User_Create: r.User_Create ?? "",
           }),
@@ -304,9 +310,9 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Nama_SPK: item.Nama_SPK ?? "",
-        Tanggal_SPK: formatTanggal(item.Tanggal_SPK),
-        Dateline: formatTanggal(item.Dateline),
-        Tanggal_LHK: formatTanggal(item.Tanggal_LHK),
+        Tanggal_SPK: formatTanggalSingkat(item.Tanggal_SPK),
+        Dateline: formatTanggalSingkat(item.Dateline),
+        Tanggal_LHK: formatTanggalSingkat(item.Tanggal_LHK),
         Bahan: r.Bahan ?? "",
         Panjang_Output: angkaExcel(r.Panjang_Output),
         Jumlah_Output: angkaExcel(r.Jumlah_Output),
@@ -370,23 +376,28 @@ const exportDetail = async () => {
     <template #filter-left>
       <div class="f-group">
         <span class="f-label">Tanggal LHK</span>
-        <input type="date" v-model="filterState.dtAwal" class="f-date" />
+        <TanggalInput v-model="filterState.dtAwal" class="f-date" ikon />
         <span class="f-sep">s/d</span>
-        <input type="date" v-model="filterState.dtAkhir" class="f-date" />
+        <TanggalInput v-model="filterState.dtAkhir" class="f-date" ikon />
       </div>
     </template>
 
     <template #item.Nomor_LHK="{ item }">
       {{ item.Nomor_LHK || "-" }}
     </template>
+    <template #item.Nama_SPK="{ item }">
+      <div class="nama-spk-wrap" :title="item.Nama_SPK || ''">
+        {{ item.Nama_SPK || "-" }}
+      </div>
+    </template>
     <template #item.Tanggal_SPK="{ item }">
-      {{ formatTanggal(item.Tanggal_SPK) }}
+      {{ formatTanggalSingkat(item.Tanggal_SPK) }}
     </template>
     <template #item.Dateline="{ item }">
-      {{ formatTanggal(item.Dateline) }}
+      {{ formatTanggalSingkat(item.Dateline) }}
     </template>
     <template #item.Tanggal_LHK="{ item }">
-      {{ formatTanggal(item.Tanggal_LHK) }}
+      {{ formatTanggalSingkat(item.Tanggal_LHK) }}
     </template>
 
     <template #item.Status_Terakhir="{ item }">
@@ -540,5 +551,24 @@ const exportDetail = async () => {
 .st-open {
   color: #c62828;
   font-weight: 600;
+}
+
+:deep(td.col-nama-spk),
+:deep(td:has(.nama-spk-wrap)) {
+  white-space: normal !important;
+  height: auto !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+}
+.nama-spk-wrap {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.25;
+  font-size: 11px;
+  max-height: 34px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 </style>

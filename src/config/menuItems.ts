@@ -1157,6 +1157,12 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 5505,
             },
             {
+              title: "PO Jasa MMT",
+              to: "/mmt/finance/po-jasa",
+              icon: IconTool,
+              menuId: 5565,
+            },
+            {
               title: "Retur Beli",
               to: "/mmt/finance/retur-beli",
               icon: IconArrowBack,

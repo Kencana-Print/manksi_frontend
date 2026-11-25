@@ -4529,6 +4529,53 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/finance/po-jasa",
+      name: "PoJasaMmtBrowse",
+      component: () => import("@/views/mmt/finance/PoJasaMmtView.vue"),
+      meta: {
+        title: "PO Jasa MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5565",
+      },
+    },
+    {
+      path: "/mmt/finance/po-jasa/create",
+      name: "PoJasaMmtCreate",
+      component: () => import("@/views/mmt/finance/PoJasaMmtFormView.vue"),
+      meta: {
+        title: "Tambah PO Jasa MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5565",
+        browseRoute: "PoJasaMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-jasa/edit/:nomor",
+      name: "PoJasaMmtEdit",
+      component: () => import("@/views/mmt/finance/PoJasaMmtFormView.vue"),
+      meta: {
+        title: "Ubah PO Jasa MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5565",
+        browseRoute: "PoJasaMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-jasa/print/:nomor",
+      name: "PoJasaMmtPrint",
+      component: () => import("@/views/mmt/finance/PoJasaMmtPrintView.vue"),
+      meta: {
+        title: "Cetak PO Jasa MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5565",
+        browseRoute: "PoJasaMmtBrowse",
+      },
+    },
+    {
       path: "/mmt/finance/retur-beli",
       name: "ReturBeliMmtBrowse",
       component: () => import("@/views/mmt/finance/ReturBeliMmtView.vue"),

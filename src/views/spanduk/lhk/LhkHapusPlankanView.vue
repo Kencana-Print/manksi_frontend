@@ -11,7 +11,8 @@ import type {
   LhkHapusPlankanDetailRow,
 } from "@/services/spanduk/lhk/lhkHapusPlankanService";
 import { IconEraser, IconPrinter, IconFileExport } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
+import TanggalInput from "@/components/TanggalInput.vue";
 
 interface ExportDetailRow {
   Nomor: string;
@@ -89,7 +90,6 @@ const {
   canExport,
   selectedItem,
   fetchData,
-  exportToExcel,
 } = useBrowse<LhkHapusPlankanRow>({
   menuId: "4",
   fetchApi: muatData,
@@ -103,13 +103,6 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
-];
-
-const kolomMaster: ExcelColumn[] = [
-  { header: "Nomor", key: "Nomor", width: 20 },
-  { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
-  { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
-  { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
 ];
 
 const NUM = "#,##0.00";
@@ -187,14 +180,6 @@ const onPrint = () => {
   window.open(url, "_blank");
 };
 
-// --- EXPORT ---
-const exportMaster = () =>
-  exportToExcel("LHK_Hapus_Plankan_Header", {
-    columns: kolomMaster,
-    getData: () =>
-      dataTampil().map((r) => ({ ...r, Tanggal: formatTanggal(r.Tanggal) })),
-  });
-
 // Hanya detail dari LHK yang sedang tampil di grid
 const exportDetail = async () => {
   if (!canExport.value) {
@@ -211,7 +196,7 @@ const exportDetail = async () => {
     for (const r of detailMap.value[item.Nomor] ?? []) {
       rows.push({
         Nomor: item.Nomor,
-        Tanggal: formatTanggal(item.Tanggal),
+        Tanggal: formatTanggalSingkat(item.Tanggal),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
         Nomor_SPK: r.Nomor_SPK,
@@ -263,27 +248,26 @@ const numFmt = (v: number | null) =>
     :can-insert="canInsert"
     :can-edit="canEdit"
     :can-delete="canDelete"
-    :can-export="canExport"
+    :can-export="false"
     item-value="Nomor"
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
     @refresh="fetchData"
-    @export="exportMaster"
     show-expand
     v-model:expanded="expandedRows"
   >
     <template #filter-left>
       <div class="f-group">
         <span class="f-label">Tanggal</span>
-        <input type="date" v-model="filterState.dtAwal" class="f-date" />
+        <TanggalInput v-model="filterState.dtAwal" class="f-date" ikon />
         <span class="f-sep">s/d</span>
-        <input type="date" v-model="filterState.dtAkhir" class="f-date" />
+        <TanggalInput v-model="filterState.dtAkhir" class="f-date" ikon />
       </div>
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
     </template>
 
     <!-- Detail Expand -->
@@ -295,7 +279,6 @@ const numFmt = (v: number | null) =>
             <tr>
               <th width="130">Nomor MAP</th>
               <th>Nama MAP</th>
-              <th width="80" class="tr">Jml Order</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
               <th width="80" class="tr">J Plangkan</th>
@@ -307,7 +290,6 @@ const numFmt = (v: number | null) =>
             <tr v-for="r in detailMap[item.Nomor]" :key="r.Nomor_SPK">
               <td>{{ r.Nomor_SPK }}</td>
               <td class="font-weight-bold">{{ r.Nama_SPK }}</td>
-              <td class="tr">{{ numFmt(r.Jumlah_Order) }}</td>
               <td class="tr">{{ numFmt(r.Panjang) }}</td>
               <td class="tr">{{ numFmt(r.Lebar) }}</td>
               <td class="tr">{{ numFmt(r.J_Plangkan) }}</td>
@@ -317,7 +299,7 @@ const numFmt = (v: number | null) =>
               <td>{{ r.Keterangan || "-" }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="8" class="text-center text-grey py-3 font-italic">
+              <td colspan="7" class="text-center text-grey py-3 font-italic">
                 Detail LHK Hapus Plankan tidak ditemukan.
               </td>
             </tr>

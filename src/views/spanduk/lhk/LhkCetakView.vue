@@ -18,7 +18,8 @@ import {
   IconCircleCheck,
   IconCircleX,
 } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
+import TanggalInput from "@/components/TanggalInput.vue";
 
 interface ExportMasterRow {
   Nomor: string;
@@ -151,7 +152,12 @@ const headers = [
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
   { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
   { title: "Kar Harian", key: "Kar_Harian", width: "110px", align: "end" },
-  { title: "Output Produksi", key: "Jml_Meter", width: "140px", align: "end" },
+  {
+    title: "Output Produksi (m)",
+    key: "Jml_Meter",
+    width: "155px",
+    align: "end",
+  },
   {
     title: "Pemakaian Kain (m)",
     key: "Jml_Kain",
@@ -210,9 +216,9 @@ const kolomMaster: ExcelColumn[] = [
     numFmt: INT,
   },
   {
-    header: "Output Produksi",
+    header: "Output Produksi (m)",
     key: "Jml_Meter",
-    width: 16,
+    width: 18,
     align: "right",
     numFmt: NUM,
   },
@@ -238,25 +244,25 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Nomor SPK", key: "Nomor_SPK", width: 20 },
   { header: "Nama SPK", key: "Nama_SPK", width: 36 },
   {
-    header: "Jumlah Order",
+    header: "Jml Order (pcs)",
     key: "Jumlah_Order",
-    width: 14,
+    width: 15,
     align: "right",
     numFmt: NUM,
   },
-  { header: "Panjang", key: "Panjang", width: 10, align: "right", numFmt: NUM },
-  { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
+  { header: "Panjang (m)", key: "Panjang", width: 12, align: "right", numFmt: NUM },
+  { header: "Lebar (m)", key: "Lebar", width: 12, align: "right", numFmt: NUM },
   {
-    header: "Qty Cetak",
+    header: "Qty Cetak (pcs)",
     key: "Qty_Cetak",
-    width: 12,
+    width: 15,
     align: "right",
     numFmt: INT,
   },
   {
-    header: "Output Produksi",
+    header: "Output Produksi (m)",
     key: "Output_Produksi",
-    width: 16,
+    width: 18,
     align: "right",
     numFmt: NUM,
   },
@@ -390,7 +396,7 @@ const exportMaster = () =>
     getData: () =>
       dataTampil().map((r) => ({
         ...r,
-        Tanggal: formatTanggal(r.Tanggal),
+        Tanggal: formatTanggalSingkat(r.Tanggal),
         Sesi: sesiLabel(r.Sesi),
         Kode_Pabrik: r.Kode_Pabrik ?? "",
         Nama_Pabrik: r.Nama_Pabrik ?? "",
@@ -423,7 +429,7 @@ const exportDetail = async () => {
     for (const r of detailMap.value[item.Nomor] ?? []) {
       rows.push({
         Nomor: item.Nomor,
-        Tanggal: formatTanggal(item.Tanggal),
+        Tanggal: formatTanggalSingkat(item.Tanggal),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
         Nomor_SPK: r.Nomor_SPK,
@@ -439,7 +445,7 @@ const exportDetail = async () => {
     for (const k of kainMap.value[item.Nomor] ?? []) {
       rowsKain.push({
         Nomor: item.Nomor,
-        Tanggal: formatTanggal(item.Tanggal),
+        Tanggal: formatTanggalSingkat(item.Tanggal),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
         Kode_Bahan: k.Kode_Bahan,
@@ -500,14 +506,14 @@ const numFmt = (v: number | string | null) =>
     <template #filter-left>
       <div class="f-group">
         <span class="f-label">Tanggal</span>
-        <input type="date" v-model="filterState.dtAwal" class="f-date" />
+        <TanggalInput v-model="filterState.dtAwal" class="f-date" ikon />
         <span class="f-sep">s/d</span>
-        <input type="date" v-model="filterState.dtAkhir" class="f-date" />
+        <TanggalInput v-model="filterState.dtAkhir" class="f-date" ikon />
       </div>
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
     </template>
 
     <template #item.Sesi="{ item }">
@@ -562,7 +568,7 @@ const numFmt = (v: number | string | null) =>
     <template #detail="{ item }">
       <div class="expand-wrap">
         <div v-if="item.Apv_Status" class="apv-info mb-2">
-          Approval kelebihan kain:
+          Approval kelebihan kain (SPV):
           <b>{{ apvLabel(item.Apv_Status) }}</b>
           <template v-if="item.Apv_User">
             oleh {{ item.Apv_User }} ({{ fmtApvTgl(item.Apv_Tgl) }})
@@ -575,11 +581,11 @@ const numFmt = (v: number | string | null) =>
             <tr>
               <th width="130">Nomor SPK</th>
               <th>Nama SPK</th>
-              <th width="90" class="tr">Jml Order</th>
-              <th width="80" class="tr">Panjang</th>
-              <th width="80" class="tr">Lebar</th>
-              <th width="90" class="tr">Qty Cetak</th>
-              <th width="110" class="tr">Output Produksi</th>
+              <th width="95" class="tr">Jml Order (pcs)</th>
+              <th width="80" class="tr">Panjang (m)</th>
+              <th width="80" class="tr">Lebar (m)</th>
+              <th width="95" class="tr">Qty Cetak (pcs)</th>
+              <th width="120" class="tr">Output Produksi (m)</th>
               <th width="100" class="tr">Jml Plangkan</th>
             </tr>
           </thead>
@@ -665,7 +671,7 @@ const numFmt = (v: number | string | null) =>
       <v-dialog v-model="dlgApv" max-width="460" persistent>
         <v-card v-if="apvItem">
           <v-card-title class="dlg-title">
-            {{ apvAksi === "TOLAK" ? "Tolak" : "Setujui" }} Kelebihan Kain -
+            {{ apvAksi === "TOLAK" ? "Tolak" : "Setujui" }} Kelebihan Kain (SPV) -
             {{ apvItem.Nomor }}
           </v-card-title>
           <v-card-text class="dlg-body">

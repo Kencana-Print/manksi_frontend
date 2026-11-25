@@ -59,6 +59,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // ⬅ /uploads/ ditambahkan — path ini disajikan backend Express
         // (gambar upload Maklon Barang, dll), sama seperti /images/ dan

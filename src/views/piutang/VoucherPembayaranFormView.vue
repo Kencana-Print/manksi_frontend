@@ -129,7 +129,7 @@ const pin5Config = computed(() => {
 });
 
 const adaBpj = computed(() =>
-  detail.value.some((d) => d.tipe === "BPJ" && d.nomor),
+  detail.value.some((d) => ["BPJ", "POJ"].includes(d.tipe) && d.nomor),
 );
 // Baris bahan yang benar-benar terisi (hanya ini yang ikut tersimpan)
 const bahanTerisi = computed(() => bahanTambahan.value.filter((b) => b.nama));
@@ -153,6 +153,7 @@ const xtotalDetail = computed(() =>
         "BPB",
         "BPJ",
         "POE",
+        "POJ",
         "MMT",
         "BPE",
         "BPG",
@@ -554,6 +555,7 @@ const notaTypeConfig = computed(() => {
     BPB: { title: "BPB Bahan", color: "#1565c0" },
     BPJ: { title: "BPB Jasa", color: "#2e7d32" },
     POE: { title: "PO External", color: "#6a1b9a" },
+    POJ: { title: "PO Jasa MMT", color: "#00838f" },
     PJG: { title: "Potongan Jasa", color: "#4e342e" },
     MMT: { title: "BPB MMT", color: "#00695c" },
     BPE: { title: "BPB PO External MMT", color: "#0277bd" },
@@ -1160,6 +1162,7 @@ const executeClose = () => {
                           <option value="BPJ">BPB Jasa</option>
                           <option value="MMT">BPB MMT</option>
                           <option value="BPE">BPB PO Ext MMT</option>
+                          <option value="POJ">PO Jasa MMT</option>
                           <option value="BPG">BPB Non Bahan</option>
                           <option value="POL">Rekap Belanja</option>
                           <option value="POB">PO Bahan</option>
@@ -1672,11 +1675,11 @@ const executeClose = () => {
                 <th v-if="notaModalType === 'BPG'" style="width: 90px">
                   Jenis
                 </th>
-                <th v-if="!['POE', 'BPE'].includes(notaModalType)">
+                <th v-if="!['POE', 'BPE', 'POJ'].includes(notaModalType)">
                   Keterangan
                 </th>
-                <th v-if="['POE', 'BPE'].includes(notaModalType)">SPK</th>
-                <th v-if="notaModalType === 'POE'">Nama SPK</th>
+                <th v-if="['POE', 'BPE', 'POJ'].includes(notaModalType)">SPK</th>
+                <th v-if="['POE', 'POJ'].includes(notaModalType)">Nama SPK</th>
                 <th>
                   {{ notaModalType === "RES" ? "Ekspedisi" : "Supplier" }}
                 </th>
@@ -1705,13 +1708,13 @@ const executeClose = () => {
                 <td>{{ n.Nomor }}</td>
                 <td>{{ n.Tanggal }}</td>
                 <td v-if="notaModalType === 'BPG'">{{ n.Jenis }}</td>
-                <td v-if="!['POE', 'BPE'].includes(notaModalType)">
+                <td v-if="!['POE', 'BPE', 'POJ'].includes(notaModalType)">
                   {{ n.Keterangan }}
                 </td>
-                <td v-if="['POE', 'BPE'].includes(notaModalType)">
+                <td v-if="['POE', 'BPE', 'POJ'].includes(notaModalType)">
                   {{ n.Spk }}
                 </td>
-                <td v-if="notaModalType === 'POE'">{{ n.NamaSpk }}</td>
+                <td v-if="['POE', 'POJ'].includes(notaModalType)">{{ n.NamaSpk }}</td>
                 <td>{{ n.Supplier }}</td>
               </tr>
               <tr v-if="!notaOptions.length">

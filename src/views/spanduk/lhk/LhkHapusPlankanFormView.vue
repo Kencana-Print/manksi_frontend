@@ -503,7 +503,6 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 32px" class="tc">No</th>
                 <th style="width: 160px">Nomor MAP</th>
                 <th style="width: 220px">Nama Order</th>
-                <th style="width: 80px" class="tr">Jml Order</th>
                 <th style="width: 70px" class="tr">Panjang</th>
                 <th style="width: 70px" class="tr">Lebar</th>
                 <th style="width: 85px" class="tr">J Plangkan</th>
@@ -549,9 +548,6 @@ const tutupSetelahSimpan = () => {
                     readonly
                     :title="row.nama"
                   />
-                </td>
-                <td class="p0">
-                  <input :value="row.jumlahOrder" class="ci tr ro" readonly />
                 </td>
                 <td class="p0">
                   <input :value="row.panjang" class="ci tr ro" readonly />
