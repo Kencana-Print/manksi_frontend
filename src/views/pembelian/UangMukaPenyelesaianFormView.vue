@@ -1030,8 +1030,8 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
           <span>Kas</span><b class="mono">{{ form.rek_kode }}</b>
         </div>
         <div v-if="form.mode_pd" class="laci-info">
-          Dana berasal dari laci {{ form.rek_kode }}. Sisa yang tidak terpakai
-          tetap di laci, tidak dikembalikan lewat transfer.
+          Dana berasal dari laci {{ form.rek_kode }} - {{ form.rek_nama }}. Sisa
+          yang tidak terpakai tetap di laci, tidak dikembalikan lewat transfer.
         </div>
       </div>
 
@@ -1142,6 +1142,23 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
             hide-details
           />
         </template>
+      </div>
+
+      <div v-if="form.mode_pd && totalSisa > 0" class="desktop-form-section">
+        <div class="section-label">Sisa Dana Belanja</div>
+        <div class="info-row">
+          <span>Sisa</span><b>{{ fmt(totalSisa) }}</b>
+        </div>
+        <div class="info-row">
+          <span>Masuk ke account</span><b class="mono">{{ form.rek_kode }}</b>
+        </div>
+        <div class="info-row">
+          <span>Nama account</span><b>{{ form.rek_nama }}</b>
+        </div>
+        <div class="laci-info">
+          Sisa tidak dibukukan ulang. Uangnya tetap berada di laci
+          {{ form.rek_kode }}.
+        </div>
       </div>
 
       <div v-if="form.info_permintaan" class="desktop-form-section">

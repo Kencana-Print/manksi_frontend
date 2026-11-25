@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from "vue";
+import { ref, computed, nextTick, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -15,6 +15,7 @@ import { permintaanPembelianFormService } from "@/services/garmen/permintaanPemb
 
 // Gunakan Search Modal yang sudah ada untuk pencarian barang
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
+import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -37,6 +38,21 @@ const activeGridIndex = ref(-1);
 // Tujuan permintaan pembelian per cabang; selain itu default HO
 const MINTA_KE_DEFAULT: Record<string, string> = { P02: "P04" };
 
+const barisKosong = () => ({
+  kode: "",
+  nama: "",
+  satuan: "",
+  jumlah: 0,
+  harga: 0,
+  total: 0,
+  ket: "",
+  kegunaan: "",
+  realisasi: 0,
+  cc_kode: 0,
+  ccnama: "",
+  dcnama: "",
+});
+
 const defaultData = {
   header: {
     mb_nomor: "",
@@ -47,19 +63,7 @@ const defaultData = {
     mb_ket: "",
     status: "", // Untuk validasi
   },
-  items: [
-    {
-      kode: "",
-      nama: "",
-      satuan: "",
-      jumlah: 0,
-      harga: 0,
-      total: 0,
-      ket: "",
-      kegunaan: "",
-      realisasi: 0,
-    },
-  ] as any[],
+  items: [barisKosong()] as any[],
   realisasi: [] as any[],
 };
 
@@ -94,6 +98,7 @@ const {
     activeTab.value = "transaksi";
     showPrintDialog.value = false;
     nomorToPrint.value = "";
+    bersihkanPending();
   },
   fetchApi: async () => {
     const res = await permintaanPembelianFormService.getDetail(
@@ -119,9 +124,12 @@ const {
       items: data.items,
     });
   },
-  onSuccess: (res: any) => {
+  onSuccess: async (res: any) => {
     toast.success("Permintaan berhasil disimpan!");
     const noTersimpan = res.data?.data?.nomor || formData.value.header.mb_nomor;
+    if (Object.keys(pendingGambar.value).length > 0) {
+      await uploadPending(noTersimpan);
+    }
     nomorToPrint.value = noTersimpan;
     showPrintDialog.value = true;
   },
@@ -134,17 +142,7 @@ const isDetailRinci = computed(() =>
 
 // --- GRID HANDLERS ---
 const addItem = () => {
-  formData.value.items.push({
-    kode: "",
-    nama: "",
-    satuan: "",
-    jumlah: 0,
-    harga: 0,
-    total: 0,
-    ket: "", // Spesifikasi
-    kegunaan: "", // Kegunaan
-    realisasi: 0,
-  });
+  formData.value.items.push(barisKosong());
 };
 
 const removeItem = (idx: number) => {
@@ -182,18 +180,6 @@ const setBarang = (v: any) => {
     addItem();
   }
 };
-
-const barisKosong = () => ({
-  kode: "",
-  nama: "",
-  satuan: "",
-  jumlah: 0,
-  harga: 0,
-  total: 0,
-  ket: "",
-  kegunaan: "",
-  realisasi: 0,
-});
 
 const setBarangMulti = async (list: any[]) => {
   const terisi = formData.value.items.filter(
@@ -295,6 +281,23 @@ const onKodeEnter = async (idx: number) => {
   }
 };
 
+// ── Cost Center per baris ──
+const showCcModal = ref(false);
+const activeCcIdx = ref(-1);
+const openCcModal = (idx: number) => {
+  activeCcIdx.value = idx;
+  showCcModal.value = true;
+};
+const onCcSelected = (item: any) => {
+  const i = activeCcIdx.value;
+  if (i < 0) return;
+  const row = formData.value.items[i];
+  row.cc_kode = item.cc_kode;
+  row.ccnama = item.cc_nama;
+  row.dcnama = item.dc_nama || "";
+  showCcModal.value = false;
+};
+
 const fmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 
 const recalcTotal = (i: number) => {
@@ -359,12 +362,31 @@ const validateSave = () => {
     }
   }
 
+  // 4b. Cost Center wajib untuk dokumen baru (atau dokumen yang sudah punya CC);
+  // dokumen lama tanpa CC boleh tetap kosong.
+  const wajibCc = !isEditMode.value || validDetails.some((d: any) => d.cc_kode);
+  if (wajibCc) {
+    for (let i = 0; i < validDetails.length; i++) {
+      const row = validDetails[i];
+      if (!row.cc_kode || !String(row.dcnama || "").trim()) {
+        return toast.warning(
+          `Cost Center & Detail CC harus diisi! (Baris ke-${i + 1})`,
+        );
+      }
+    }
+  }
+
   // 5. Validasi Status Dokumen
   if (formData.value.header.status !== "") {
     return toast.warning(
       `Sudah ${formData.value.header.status}, tidak dapat diubah.`,
     );
   }
+
+  // Gambar tertunda milik baris yang sudah dihapus/dikosongkan dibuang
+  Object.keys(pendingGambar.value).forEach((k) => {
+    if (!validDetails.some((d: any) => d.kode === k)) hapusPending(k);
+  });
 
   // Jika lolos semua, buang baris kosong dan munculkan dialog simpan
   formData.value.items = validDetails;
@@ -442,7 +464,37 @@ const activeItem = computed(() => {
   return formData.value.items[activeGridIndex.value] || null;
 });
 
+// Gambar yang dipilih sebelum dokumen disimpan (belum ada nomor).
+// Key = kode barang. Diupload otomatis setelah simpan berhasil.
+const pendingGambar = ref<Record<string, { file: File; preview: string }>>({});
+
+const hapusPending = (kode: string): void => {
+  const p = pendingGambar.value[kode];
+  if (!p) return;
+  URL.revokeObjectURL(p.preview);
+  delete pendingGambar.value[kode];
+};
+
+const bersihkanPending = (): void => {
+  Object.values(pendingGambar.value).forEach((p) =>
+    URL.revokeObjectURL(p.preview),
+  );
+  pendingGambar.value = {};
+};
+
+onBeforeUnmount(bersihkanPending);
+
+const pendingAktif = computed(() => {
+  const kode = activeItem.value?.kode;
+  return kode ? pendingGambar.value[kode] || null : null;
+});
+
+const punyaGambar = computed(
+  (): boolean => !!pendingAktif.value || activeItem.value?.foto === "YA",
+);
+
 const gambarUrl = computed((): string => {
+  if (pendingAktif.value) return pendingAktif.value.preview;
   const nomor = formData.value.header.mb_nomor;
   const kode = activeItem.value?.kode;
   if (!nomor || !kode) return "";
@@ -451,15 +503,52 @@ const gambarUrl = computed((): string => {
 
 const onGambarError = (e: Event): void => {
   const img = e.target as HTMLImageElement;
-  img.src = ""; // tidak ada fallback legacy Delphi untuk modul ini (image dulu disimpan di path lokal aplikasi lama, bukan /file-gambar/)
+  img.src = ""; // tidak ada fallback legacy Delphi untuk modul ini
+};
+
+const pesanError = (err: unknown, fallback: string): string => {
+  const msg =
+    err && typeof err === "object" && "response" in err
+      ? (err as { response?: { data?: { message?: string } } }).response?.data
+          ?.message
+      : undefined;
+  return msg || fallback;
+};
+
+const uploadKeServer = async (
+  nomor: string,
+  kode: string,
+  file: File,
+): Promise<void> => {
+  const form = new FormData();
+  form.append("gambar", file);
+  await permintaanPembelianFormService.uploadGambarItem(nomor, kode, form);
+};
+
+const uploadPending = async (nomor: string): Promise<void> => {
+  const gagal: string[] = [];
+  isUploadingGambar.value = true;
+  try {
+    for (const [kode, p] of Object.entries(pendingGambar.value)) {
+      try {
+        await uploadKeServer(nomor, kode, p.file);
+      } catch {
+        gagal.push(kode);
+      }
+    }
+  } finally {
+    isUploadingGambar.value = false;
+    bersihkanPending();
+    gambarCacheBust.value = Date.now();
+  }
+  if (gagal.length > 0) {
+    toast.warning(
+      `Dokumen tersimpan, tetapi gambar ${gagal.join(", ")} gagal diupload. Buka menu Ubah lalu upload ulang.`,
+    );
+  }
 };
 
 const triggerGambarUpload = (): void => {
-  const nomor = formData.value.header.mb_nomor;
-  if (!nomor) {
-    toast.warning("Simpan data terlebih dahulu sebelum upload gambar.");
-    return;
-  }
   if (!activeItem.value?.kode) {
     toast.warning("Pilih baris barang terlebih dahulu.");
     return;
@@ -468,44 +557,65 @@ const triggerGambarUpload = (): void => {
 };
 
 const onGambarFileSelected = async (e: Event): Promise<void> => {
+  const resetInput = (): void => {
+    if (gambarFileInputRef.value) gambarFileInputRef.value.value = "";
+  };
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
   if (file.size > 1000000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
-    if (gambarFileInputRef.value) gambarFileInputRef.value.value = "";
+    resetInput();
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    toast.error("File harus berupa gambar.");
+    resetInput();
     return;
   }
 
   const nomor = formData.value.header.mb_nomor;
   const kode = activeItem.value?.kode;
-  if (!nomor || !kode) return;
+  if (!kode) {
+    resetInput();
+    return;
+  }
+
+  // Dokumen belum disimpan: tahan di browser, upload setelah simpan berhasil
+  if (!nomor) {
+    hapusPending(kode);
+    pendingGambar.value[kode] = { file, preview: URL.createObjectURL(file) };
+    toast.info("Gambar akan diupload otomatis setelah dokumen disimpan.");
+    resetInput();
+    return;
+  }
 
   try {
     isUploadingGambar.value = true;
-    const form = new FormData();
-    form.append("gambar", file);
-    await permintaanPembelianFormService.uploadGambarItem(nomor, kode, form);
+    await uploadKeServer(nomor, kode, file);
     if (activeItem.value) activeItem.value.foto = "YA";
     gambarCacheBust.value = Date.now();
     toast.success("Gambar berhasil diupload");
   } catch (err: unknown) {
-    const msg =
-      err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data
-            ?.message
-        : undefined;
-    toast.error(msg || "Gagal upload gambar");
+    toast.error(pesanError(err, "Gagal upload gambar"));
   } finally {
     isUploadingGambar.value = false;
-    if (gambarFileInputRef.value) gambarFileInputRef.value.value = "";
+    resetInput();
   }
 };
 
 const onHapusGambarItem = async (): Promise<void> => {
   const nomor = formData.value.header.mb_nomor;
   const kode = activeItem.value?.kode;
-  if (!nomor || !kode) return;
+  if (!kode) return;
+
+  // Gambar yang belum diupload: cukup dibuang dari browser
+  if (pendingAktif.value) {
+    hapusPending(kode);
+    return;
+  }
+
+  if (!nomor) return;
   if (!confirm("Hapus gambar?")) return;
 
   try {
@@ -514,12 +624,7 @@ const onHapusGambarItem = async (): Promise<void> => {
     gambarCacheBust.value = Date.now();
     toast.success("Gambar berhasil dihapus");
   } catch (err: unknown) {
-    const msg =
-      err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { message?: string } } }).response?.data
-            ?.message
-        : undefined;
-    toast.error(msg || "Gagal hapus gambar");
+    toast.error(pesanError(err, "Gagal hapus gambar"));
   }
 };
 </script>
@@ -681,6 +786,18 @@ const onHapusGambarItem = async (): Promise<void> => {
                   >
                     Kegunaan
                   </th>
+                  <th
+                    style="min-width: 130px; background: #ffeb3b"
+                    class="text-dark"
+                  >
+                    Cost Center
+                  </th>
+                  <th
+                    style="min-width: 130px; background: #ffeb3b"
+                    class="text-dark"
+                  >
+                    Detail CC
+                  </th>
                   <th style="width: 40px" class="text-center">Aksi</th>
                 </tr>
               </thead>
@@ -771,6 +888,28 @@ const onHapusGambarItem = async (): Promise<void> => {
                     />
                   </td>
 
+                  <td class="p0">
+                    <div class="cell-grp">
+                      <input
+                        :value="item.ccnama"
+                        class="ci ro"
+                        readonly
+                        placeholder="-"
+                      />
+                      <button
+                        type="button"
+                        class="ci-btn"
+                        title="Cari Cost Center"
+                        @click.stop="openCcModal(Number(idx))"
+                      >
+                        <IconSearch :size="12" color="#1565c0" />
+                      </button>
+                    </div>
+                  </td>
+                  <td class="p0">
+                    <input :value="item.dcnama" class="ci ro" readonly />
+                  </td>
+
                   <td class="text-center p0">
                     <button
                       type="button"
@@ -784,7 +923,7 @@ const onHapusGambarItem = async (): Promise<void> => {
                 </tr>
                 <tr v-if="formData.items.length === 0">
                   <td
-                    :colspan="isDetailRinci ? 11 : 7"
+                    :colspan="isDetailRinci ? 13 : 9"
                     class="empty-row text-center text-grey font-italic py-4"
                   >
                     Klik + Tambah Baris untuk mulai meminta barang
@@ -873,7 +1012,7 @@ const onHapusGambarItem = async (): Promise<void> => {
       </p>
       <div class="gambar-preview-box">
         <img
-          v-if="activeItem.foto === 'YA'"
+          v-if="punyaGambar"
           :src="gambarUrl"
           class="gambar-preview"
           @error="onGambarError"
@@ -881,6 +1020,10 @@ const onHapusGambarItem = async (): Promise<void> => {
         />
         <span v-else class="text-grey">Belum ada gambar</span>
       </div>
+      <p v-if="pendingAktif" class="text-caption text-center text-warning mb-2">
+        Gambar ini belum diupload. Akan diupload otomatis setelah dokumen
+        disimpan.
+      </p>
       <div class="gambar-actions">
         <input
           ref="gambarFileInputRef"
@@ -898,7 +1041,7 @@ const onHapusGambarItem = async (): Promise<void> => {
           Upload Gambar
         </v-btn>
         <v-btn
-          v-if="activeItem.foto === 'YA'"
+          v-if="punyaGambar"
           size="small"
           color="error"
           variant="outlined"
@@ -918,6 +1061,8 @@ const onHapusGambarItem = async (): Promise<void> => {
     @selected="setBarang"
     @selected-multiple="setBarangMulti"
   />
+
+  <CostCenterSearchModal v-model="showCcModal" @selected="onCcSelected" />
 
   <!-- DIALOG KONFIRMASI CETAK -->
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>

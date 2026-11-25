@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
+import { bpbNonBahanFormService } from "@/services/garmen/bpbNonBahanFormService";
 import {
   IconFileInvoice,
   IconSearch,
   IconDatabaseOff,
+  IconEye,
 } from "@tabler/icons-vue";
 
 const props = defineProps<{
@@ -42,6 +44,47 @@ const visiblePages = computed(() => {
 });
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
+
+// ── Detail barang per PO (klik ikon mata) ──
+interface PoDetailItem {
+  Kode?: string;
+  pod_brg_kode?: string;
+  Nama?: string;
+  Satuan?: string;
+  minta?: number;
+  sudah?: number;
+  kurang?: number;
+}
+const expandedNomor = ref("");
+const detailCache = ref<Record<string, PoDetailItem[]>>({});
+const detailLoading = ref(false);
+const detailError = ref("");
+
+const formatQty = (val: unknown) =>
+  Number(val || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const toggleDetail = async (nomor: string) => {
+  detailError.value = "";
+  if (expandedNomor.value === nomor) {
+    expandedNomor.value = "";
+    return;
+  }
+  expandedNomor.value = nomor;
+  if (detailCache.value[nomor]) return;
+  detailLoading.value = true;
+  try {
+    const res = await bpbNonBahanFormService.getPoDetail(nomor, "");
+    detailCache.value[nomor] = res.data.data.detail || [];
+  } catch (e) {
+    console.error("Gagal memuat detail PO:", e);
+    detailError.value = "Gagal memuat detail barang PO.";
+  } finally {
+    detailLoading.value = false;
+  }
+};
 
 const fetchData = async () => {
   if (!props.jenis) return;
@@ -83,6 +126,9 @@ watch(
     if (isOpen) {
       search.value = "";
       currentPage.value = 1;
+      expandedNomor.value = "";
+      detailCache.value = {};
+      detailError.value = "";
       fetchData();
     }
   },
@@ -157,22 +203,72 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
+              <th style="width: 44px" class="text-center"></th>
               <th style="width: 160px">NOMOR PO</th>
               <th style="width: 110px" class="text-center">TANGGAL</th>
               <th>KETERANGAN</th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="item in items"
-              :key="item.Nomor"
-              class="lookup-row"
-              @click="selectItem(item)"
-            >
-              <td class="td-kode">{{ item.Nomor }}</td>
-              <td class="text-center">{{ item.Tanggal }}</td>
-              <td class="truncate">{{ item.Keterangan || "-" }}</td>
-            </tr>
+            <template v-for="item in items" :key="item.Nomor">
+              <tr class="lookup-row" @click="selectItem(item)">
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn-eye"
+                    :class="{ active: expandedNomor === item.Nomor }"
+                    title="Lihat barang di PO ini"
+                    @click.stop="toggleDetail(item.Nomor)"
+                  >
+                    <IconEye :size="14" />
+                  </button>
+                </td>
+                <td class="td-kode">{{ item.Nomor }}</td>
+                <td class="text-center">{{ item.Tanggal }}</td>
+                <td class="truncate">{{ item.Keterangan || "-" }}</td>
+              </tr>
+              <tr v-if="expandedNomor === item.Nomor" class="detail-row">
+                <td colspan="4" class="detail-cell">
+                  <div
+                    v-if="detailLoading && !detailCache[item.Nomor]"
+                    class="detail-state"
+                  >
+                    Memuat barang...
+                  </div>
+                  <div v-else-if="detailError" class="detail-state text-error">
+                    {{ detailError }}
+                  </div>
+                  <div
+                    v-else-if="(detailCache[item.Nomor] || []).length === 0"
+                    class="detail-state"
+                  >
+                    Tidak ada barang di PO ini.
+                  </div>
+                  <table v-else class="detail-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 110px">Kode</th>
+                        <th>Nama Barang</th>
+                        <th style="width: 60px" class="text-center">Satuan</th>
+                        <th style="width: 80px" class="text-right">Minta/PO</th>
+                        <th style="width: 80px" class="text-right">Sudah</th>
+                        <th style="width: 80px" class="text-right">Kurang</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(d, i) in detailCache[item.Nomor]" :key="i">
+                        <td class="td-kode">{{ d.Kode || d.pod_brg_kode }}</td>
+                        <td>{{ d.Nama }}</td>
+                        <td class="text-center">{{ d.Satuan }}</td>
+                        <td class="text-right">{{ formatQty(d.minta) }}</td>
+                        <td class="text-right">{{ formatQty(d.sudah) }}</td>
+                        <td class="text-right">{{ formatQty(d.kurang) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -430,5 +526,58 @@ const selectItem = (item: any) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.btn-eye {
+  background: transparent;
+  border: none;
+  color: #757575;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-eye:hover,
+.btn-eye.active {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.detail-row:hover td {
+  background: #f5faff !important;
+  color: inherit;
+}
+.detail-cell {
+  padding: 6px 10px 10px 44px !important;
+  background: #f5faff;
+  white-space: normal !important;
+  height: auto !important;
+}
+.detail-state {
+  font-size: 11px;
+  color: #757575;
+  padding: 6px 0;
+}
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: white;
+}
+.detail-table th {
+  background: #eeeeee;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border: 1px solid #e0e0e0;
+  text-align: left;
+}
+.detail-table td {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid #e0e0e0;
+  height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

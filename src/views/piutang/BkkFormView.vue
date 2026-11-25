@@ -16,8 +16,15 @@ import RekapPanggilModal, {
   type RekapOption,
   type RekapRow,
 } from "@/components/lookups/RekapPanggilModal.vue";
+import VoucherPanggilModal, {
+  type VoucherRow,
+} from "@/components/lookups/VoucherPanggilModal.vue";
+import PengajuanDanaPanggilModal, {
+  type PengajuanDanaRow,
+} from "@/components/lookups/PengajuanDanaPanggilModal.vue";
 import {
   IconReceipt2,
+  IconReceipt,
   IconPlus,
   IconTrash,
   IconSearch,
@@ -273,7 +280,7 @@ const pilihRekapRows = (rows: RekapRow[]) => {
     formData.value.Detail.map((d: any) => d.vou).filter(Boolean),
   );
   const emptyIdx = formData.value.Detail.findIndex(
-    (d: any) => !d.uraian && !d.mb && !d.pck && !d.vou,
+    (d: any) => !d.uraian && !d.mb && !d.pck && !d.vou && !d.pgj,
   );
   if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
 
@@ -303,6 +310,7 @@ const pilihRekapRows = (rows: RekapRow[]) => {
       pck: "",
       pckStore: "",
       vou: r.trs,
+      pgj: "",
       kdbrg: "",
       jenis_item: "",
       cab_item: "",
@@ -314,6 +322,70 @@ const pilihRekapRows = (rows: RekapRow[]) => {
     toast.warning(
       `${perluCek} voucher perlu cek rekening (kosong atau lebih dari satu). Periksa lewat tombol Detail.`,
     );
+};
+
+// ── Panggil Voucher langsung (tanpa Rekap) ──
+const showVoucherModal = ref(false);
+const fetchVoucherOptions = async (search: string): Promise<VoucherRow[]> => {
+  const res = await bkkFormService.getVoucherOptions(
+    search,
+    isEditMode.value ? String(route.params.nomor || "") : "",
+  );
+  return res.data.data || [];
+};
+const voucherTerpakai = computed<string[]>(() =>
+  formData.value.Detail.map((d: { vou?: string }) => d.vou || "").filter(
+    Boolean,
+  ),
+);
+
+// ── Panggil Pengajuan Dana (per item) ──
+const showPgjModal = ref(false);
+const fetchPgjOptions = (search: string): Promise<PengajuanDanaRow[]> =>
+  bkkFormService.getPengajuanDanaOptions(
+    search,
+    isEditMode.value ? String(route.params.nomor || "") : "",
+  );
+const pgjTerpakai = computed<string[]>(() =>
+  formData.value.Detail.map((d: { pgj?: string }) => d.pgj || "").filter(
+    Boolean,
+  ),
+);
+const pilihPgj = (rows: PengajuanDanaRow[]) => {
+  const emptyIdx = formData.value.Detail.findIndex(
+    (d: any) => !d.uraian && !d.mb && !d.pck && !d.vou && !d.pgj,
+  );
+  if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
+
+  rows.forEach((r) => {
+    formData.value.Detail.push({
+      no: formData.value.Detail.length + 1,
+      uraian: r.spesifikasi ? `${r.nama} - ${r.spesifikasi}` : r.nama,
+      satuan: "",
+      qty: 1,
+      harga: r.nominal,
+      total: r.nominal,
+      rekkode: "",
+      reknama: "",
+      cckode: r.ccKode || 0,
+      ccnama: r.ccNama || "",
+      dcnama: r.dcNama || "",
+      supkode: "",
+      supnama: "",
+      bank: "",
+      rekening: "",
+      atasnama: "",
+      mb: "",
+      pck: "",
+      pckStore: "",
+      vou: "",
+      pgj: r.pgj,
+      kdbrg: "",
+      jenis_item: "",
+      cab_item: "",
+    });
+  });
+  toast.success(`${rows.length} item Pengajuan Dana ditambahkan.`);
 };
 
 // ── Detail grid ──
@@ -339,6 +411,7 @@ const addRow = () => {
     pck: "",
     pckStore: "",
     vou: "",
+    pgj: "",
     kdbrg: "",
     jenis_item: "",
     cab_item: "",
@@ -560,8 +633,13 @@ const validateSave = () => {
     toast.warning("Minimal 1 baris detail harus memiliki uraian.");
     return;
   }
-  if (validRows.some((d: any) => d.vou) && formData.value.Cabang !== "P01") {
-    toast.warning("Baris dari Rekap Pembayaran hanya untuk BKK cabang P01.");
+  if (
+    validRows.some((d: any) => d.vou || d.pgj) &&
+    formData.value.Cabang !== "P01"
+  ) {
+    toast.warning(
+      "Baris Voucher / Rekap Pembayaran / Pengajuan Dana hanya untuk BKK cabang P01.",
+    );
     return;
   }
   for (const row of validRows) {
@@ -731,6 +809,32 @@ const pilihCetak = () => {
             <button
               type="button"
               class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Voucher hanya untuk BKK cabang P01'
+                  : ''
+              "
+              @click="showVoucherModal = true"
+            >
+              <IconReceipt :size="14" class="mr-1" /> Panggil Voucher
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Pengajuan Dana hanya untuk BKK cabang P01'
+                  : ''
+              "
+              @click="showPgjModal = true"
+            >
+              <IconReceipt :size="14" class="mr-1" /> Panggil Pengajuan Dana
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
               @click="openMbSearchModal"
             >
               <IconShoppingCartPlus :size="14" class="mr-1" /> Ambil dari Minta
@@ -772,7 +876,7 @@ const pilihCetak = () => {
                 <td class="td-inp">
                   <input
                     :value="numFmt(row.qty)"
-                    :disabled="!!row.vou"
+                    :disabled="!!row.vou || !!row.pgj"
                     type="text"
                     inputmode="numeric"
                     class="cell tr"
@@ -847,7 +951,9 @@ const pilihCetak = () => {
                           ? `PCK: ${row.pck}`
                           : row.vou
                             ? `VOU: ${row.vou}`
-                            : "-"
+                            : row.pgj
+                              ? `PGJ: ${row.pgj.replace("|", " #")}`
+                              : "-"
                     }}
                   </span>
                 </td>
@@ -1034,6 +1140,18 @@ const pilihCetak = () => {
     :fetch-rows="fetchRekapRows"
     @pilih="pilihRekapRows"
   />
+  <VoucherPanggilModal
+    v-model="showVoucherModal"
+    :fetch-options="fetchVoucherOptions"
+    :exclude-nomor="voucherTerpakai"
+    @pilih="pilihRekapRows"
+  />
+  <PengajuanDanaPanggilModal
+    v-model="showPgjModal"
+    :fetch-options="fetchPgjOptions"
+    :exclude-key="pgjTerpakai"
+    @pilih="pilihPgj"
+  />
 
   <!-- Dialog Detail Baris — Supplier + Petty Cash -->
   <v-dialog v-model="showRowDetailDialog" max-width="760px" persistent>
@@ -1097,9 +1215,14 @@ const pilihCetak = () => {
               (hapus lewat tombol hapus baris, akan hapus semua item terkait)
             </div>
             <div v-if="activeDetailRow.vou" class="dr-hint mb-2">
-              Dari Rekap Pembayaran, voucher <b>{{ activeDetailRow.vou }}</b
+              Voucher <b>{{ activeDetailRow.vou }}</b
               >. Supplier dan nominal mengikuti voucher dan tidak bisa diubah.
               Bank/rekening boleh dipilih.
+            </div>
+            <div v-if="activeDetailRow.pgj" class="dr-hint mb-2">
+              Pengajuan Dana
+              <b>{{ activeDetailRow.pgj.replace("|", " item ") }}</b
+              >. Nominal boleh diubah; supplier tidak wajib.
             </div>
             <div class="dr-field">
               <label class="dr-lbl">No. Petty Cash</label>

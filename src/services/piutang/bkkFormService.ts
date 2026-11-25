@@ -1,4 +1,5 @@
 import api from "@/services/api";
+import type { PengajuanDanaRow } from "@/components/lookups/PengajuanDanaPanggilModal.vue";
 
 export const bkkFormService = {
   getAccountOptions(cabang: string) {
@@ -64,5 +65,19 @@ export const bkkFormService = {
   },
   getRekapRows(nomor: string) {
     return api.get("/piutang/bkk-form/rekap-rows", { params: { nomor } });
+  },
+  getVoucherOptions(search: string, nomor = "") {
+    return api.get("/piutang/bkk-form/voucher-options", {
+      params: { search, nomor },
+    });
+  },
+  async getPengajuanDanaOptions(
+    search: string,
+    nomor = "",
+  ): Promise<PengajuanDanaRow[]> {
+    const res = await api.get("/piutang/bkk-form/pengajuan-dana-options", {
+      params: { search, nomor },
+    });
+    return res.data.data || [];
   },
 };
