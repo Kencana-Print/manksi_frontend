@@ -117,7 +117,7 @@ const teks = (row: object, k: LaporanKolom): string => {
     const s = String(v);
     return `${formatTanggal(s.slice(0, 10))} ${s.slice(11, 16)}`.trim();
   }
-  if (k.tipe === "number" || k.tipe === "currency") return fmtAngka(Number(v));
+  if (k.tipe === "number" || k.tipe === "currency") return fmtAngka(dua(Number(v) || 0));
   return String(v);
 };
 
@@ -796,7 +796,7 @@ type NilaiExcel = string | number | Date | null;
 
 const nilaiExcel = (row: object, k: LaporanKolom): NilaiExcel => {
   const v = baca(row, k.key);
-  if (k.tipe === "number") return Number(v) || 0;
+  if (k.tipe === "number") return dua(Number(v) || 0);
   if (k.tipe === "date") return toExcelDate(kosong(v) ? null : String(v));
   return teks(row, k);
 };

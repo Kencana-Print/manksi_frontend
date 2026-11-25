@@ -41,8 +41,26 @@ api.interceptors.request.use(
   },
 );
 
+/** Clamp floating-point noise (|v| < 1e-10) → 0, applied recursively to plain JSON objects/arrays. */
+const sanitizeNumbers = (v: unknown): unknown => {
+  if (typeof v === "number") return Math.abs(v) < 1e-10 ? 0 : v;
+  if (Array.isArray(v)) return v.map(sanitizeNumbers);
+  if (v !== null && typeof v === "object") {
+    const proto = Object.getPrototypeOf(v);
+    if (proto !== Object.prototype && proto !== null) return v;
+    const o = v as Record<string, unknown>;
+    for (const k in o) o[k] = sanitizeNumbers(o[k]);
+  }
+  return v;
+};
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data !== null && typeof response.data === "object") {
+      response.data = sanitizeNumbers(response.data);
+    }
+    return response;
+  },
   (error) => {
     const authStore = useAuthStore();
 

@@ -28,11 +28,16 @@ export interface LsBahanUtamaRow {
 }
 
 export interface LsBahanUtamaDetailRow {
-  barcode: string;
-  panjang: number;
-  lebar: number;
-  m2: number;
-  kondisi?: string;
+  tanggal?: string;
+  no_referensi?: string;
+  no_spk?: string;
+  kategori?: string;
+  barcode?: string;
+  jenis_mutasi?: string;
+  qty_in?: number;
+  qty_out?: number;
+  meter_in?: number;
+  meter_out?: number;
 }
 
 export interface GudangItem {
@@ -41,85 +46,47 @@ export interface GudangItem {
   aktif?: boolean | number | string;
 }
 
+const BASE = "/mmt/laporan/ls-bahan-utama";
+
 export const lsBahanUtamaService = {
-  async getReport(params: {
+  getReport(params: {
     startDate: string;
     endDate: string;
     gdgKode?: string;
     [key: string]: any;
   }) {
-    const query = {
-      startDate: params.startDate,
-      endDate: params.endDate,
-      tglAwal: params.startDate,
-      tglAkhir: params.endDate,
-      gdgKode: params.gdgKode || "WH-16",
-      gdg_kode: params.gdgKode || "WH-16",
-      ...params,
-    };
-    try {
-      return await api.get<any>("/report/produksi-mmt/ls-bahan-utama", {
-        params: query,
-      });
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        return await api.get<any>("/mmt/laporan-ls-bahan-utama", {
-          params: query,
-        });
-      }
-      throw err;
-    }
+    return api.get<any>(BASE, {
+      params: {
+        startDate: params.startDate,
+        endDate: params.endDate,
+        gdgKode: params.gdgKode || "WH-16",
+      },
+    });
   },
 
-  async getReportDetail(params: {
+  getReportDetail(params: {
     startDate: string;
     endDate: string;
     gdgKode: string;
     brgKode: string;
   }) {
-    try {
-      return await api.get<{ success: boolean; data: LsBahanUtamaDetailRow[] }>(
-        "/report/produksi-mmt/ls-bahan-utama/detail",
-        { params },
-      );
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        return await api.get<{ success: boolean; data: LsBahanUtamaDetailRow[] }>(
-          "/mmt/laporan-ls-bahan-utama/detail",
-          { params },
-        );
-      }
-      throw err;
-    }
+    return api.get<{ success: boolean; data: LsBahanUtamaDetailRow[] }>(
+      `${BASE}/detail`,
+      { params },
+    );
   },
 
-  async getGudangList() {
-    try {
-      return await api.get<any>(
-        "/report/produksi-mmt/ls-bahan-utama/gudang-list",
-        { params: { aktif: 1 } },
-      );
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        try {
-          return await api.get<any>("/mmt/lookup/gudang", {
-            params: { aktif: 1 },
-          });
-        } catch {
-          return await api.get<any>("/mmt/laporan-ls-bahan-utama/list-gudang");
-        }
-      }
-      throw err;
-    }
+  getGudangList() {
+    return api.get<any>(`${BASE}/list-gudang`);
   },
 
   getTotalRoll() {
-    return api.get<{ total_roll: number }>(
-      "/report/produksi-mmt/ls-bahan-utama/total-roll",
+    return api.get<{ success: boolean; data: { total_roll: number; total_jenis_barang: number; total_incoming: number; total_outgoing: number } }>(
+      `${BASE}/total-roll`,
     );
   },
 
   getFlow6Bulan() {
-    return api.get<any[]>("/report/produksi-mmt/ls-bahan-utama/flow-6-bulan");
+    return api.get<any>(`${BASE}/flow-6-bulan`);
   },
 };

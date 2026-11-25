@@ -974,7 +974,7 @@ const onDpNominalBlur = (e: Event, idx: number) => {
                         v-model="formData.finishing"
                         class="inp flex-1"
                         :disabled="isFormReadOnly"
-                        placeholder="Mata ayam, slongsong, potong pas, dll."
+                        placeholder="Misal: Mata ayam, slongsong, dll."
                     />
                 </div>
 

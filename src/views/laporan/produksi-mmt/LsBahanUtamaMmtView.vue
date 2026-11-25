@@ -8,7 +8,8 @@ import type {
 } from "@/components/laporan/laporanTypes";
 import { useBrowse } from "@/composables/useBrowse";
 import { formatTanggal } from "@/utils/dateFormat";
-import { IconPrinter, IconLayersSubtract } from "@tabler/icons-vue";
+import { IconPrinter, IconLayersSubtract, IconSearch } from "@tabler/icons-vue";
+import GudangLookupView from "@/modal/GudangLookupView.vue";
 import {
   lsBahanUtamaService,
   type LsBahanUtamaRow,
@@ -32,7 +33,9 @@ const filterState = ref({
 });
 
 const gudangList = ref<GudangItem[]>([]);
+const showGudangLookup = ref(false);
 const semuaJenis = ref<string[]>([]);
+const semuaStatus = ref<string[]>([]);
 const periodeTampil = ref({ awal: "", akhir: "" });
 
 let lastFetchKey = "";
@@ -88,9 +91,9 @@ const loadGudang = async () => {
   }
 };
 
-const onGudangChange = () => {
-  const wh = gudangList.value.find((g) => g.kode === filterState.value.gdgKode);
-  if (wh) filterState.value.gdgNama = wh.nama;
+const onSelectGudang = (g: { Kode: string; Nama: string }) => {
+  filterState.value.gdgKode = g.Kode;
+  filterState.value.gdgNama = g.Nama;
   lastFetchKey = ""; // Reset cache saat gudang berganti
   fetchData();
 };
@@ -137,47 +140,35 @@ const muatData = async (): Promise<LsBahanUtamaRow[]> => {
 
   periodeTampil.value = { awal: dtAwal, akhir: dtAkhir };
 
-  // Ambil semua opsi jenis unik dari data mentah sebelum filter
+  // Ambil semua opsi jenis & status unik dari data mentah sebelum filter
   const jSet = new Set<string>();
+  const sSet = new Set<string>();
   for (const r of raw) {
     const j = String(
       r.jb_nama ?? r.jenis ?? r.Jenis ?? r.brg_jenis ?? r.kategori ?? "",
     ).trim();
     if (j) jSet.add(j);
+    const s = String(r.status_barang ?? r.status ?? r.Status ?? "").trim();
+    if (s) sSet.add(s);
   }
   semuaJenis.value = Array.from(jSet).sort();
+  semuaStatus.value = Array.from(sSet).sort();
 
-  // Normalisasi data dan status
+  // Reset status jika nilai stale (mis. AKTIF dari sessionStorage lama) tidak ada di opsi
+  if (
+    filterState.value.status !== "SEMUA" &&
+    !semuaStatus.value.some(
+      (s) => s.toUpperCase() === filterState.value.status.toUpperCase(),
+    )
+  ) {
+    filterState.value.status = "SEMUA";
+  }
+
+  // Normalisasi data
   let data = raw.map((r: any) => {
-    const rawStatus = String(
+    const statusBrg = String(
       r.status_barang ?? r.status ?? r.Status ?? "",
-    ).trim().toUpperCase();
-
-    let statusBrg = "";
-    if (
-      rawStatus === "AKTIF" ||
-      rawStatus === "A" ||
-      rawStatus === "1" ||
-      r.is_aktif === 1 ||
-      r.is_aktif === true ||
-      r.is_aktif === "1"
-    ) {
-      statusBrg = "AKTIF";
-    } else if (
-      rawStatus === "NON AKTIF" ||
-      rawStatus === "NONAKTIF" ||
-      rawStatus === "NON_AKTIF" ||
-      rawStatus === "NA" ||
-      rawStatus === "N" ||
-      rawStatus === "0" ||
-      r.is_aktif === 0 ||
-      r.is_aktif === false ||
-      r.is_aktif === "0"
-    ) {
-      statusBrg = "NON AKTIF";
-    } else {
-      statusBrg = rawStatus || "AKTIF";
-    }
+    ).trim();
 
     const jb = String(
       r.jb_nama ?? r.jenis ?? r.Jenis ?? r.brg_jenis ?? r.kategori ?? "",
@@ -487,19 +478,24 @@ const onExport = () => {
 
       <div class="f-group">
         <span class="f-label">Gudang</span>
-        <select
-          v-model="filterState.gdgKode"
-          class="f-inp f-select"
-          @change="onGudangChange"
-        >
-          <option
-            v-for="g in gudangList"
-            :key="g.kode"
-            :value="g.kode"
+        <div class="f-lookup" @click="showGudangLookup = true">
+          <input
+            :value="filterState.gdgNama ? `${filterState.gdgKode} - ${filterState.gdgNama}` : filterState.gdgKode"
+            type="text"
+            readonly
+            placeholder="Pilih gudang (F1)..."
+            class="f-inp f-lookup-inp"
+            @keydown.f1.prevent="showGudangLookup = true"
+          />
+          <button
+            type="button"
+            class="f-lookup-btn"
+            title="Cari Gudang (F1)"
+            @click.stop="showGudangLookup = true"
           >
-            {{ g.nama }}
-          </option>
-        </select>
+            <IconSearch :size="13" :stroke-width="2" />
+          </button>
+        </div>
       </div>
 
       <div class="f-group">
@@ -522,10 +518,16 @@ const onExport = () => {
           @change="fetchData"
         >
           <option value="SEMUA">SEMUA</option>
-          <option value="AKTIF">AKTIF</option>
-          <option value="NON AKTIF">NON AKTIF</option>
+          <option v-for="s in semuaStatus" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+
+      <GudangLookupView
+        :is-visible="showGudangLookup"
+        mode="all"
+        @close="showGudangLookup = false"
+        @select="onSelectGudang"
+      />
     </template>
   </LaporanTable>
 </template>
@@ -558,6 +560,33 @@ const onExport = () => {
 .f-select {
   cursor: pointer;
   min-width: 120px;
+}
+.f-lookup {
+  display: inline-flex;
+  align-items: center;
+}
+.f-lookup-inp {
+  cursor: pointer;
+  min-width: 185px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+.f-lookup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 28px;
+  border: 1px solid #ccc;
+  border-radius: 0 4px 4px 0;
+  background: #f5f5f5;
+  color: #555;
+  cursor: pointer;
+}
+.f-lookup-btn:hover {
+  background: #e8f0fe;
+  color: #1976d2;
 }
 .lap-btn {
   display: inline-flex;
