@@ -358,11 +358,12 @@ const loadOpsi = async () => {
   loadingOpsi.value = true;
   errOpsi.value = "";
   try {
+    const rek = rekPilih.value || form.value.rekTujuan?.kode || "";
     const res = await svc.getBkkOptions(
       cari.value.trim(),
       nomorEdit.value,
       form.value.cabang,
-      rekPilih.value,
+      rek,
     );
     if (myReq !== opsiReq) return;
     opsi.value = res.data.data ?? [];
