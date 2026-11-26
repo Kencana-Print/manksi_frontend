@@ -5399,7 +5399,7 @@ const router = createRouter({
     },
     {
       path: "/mmt/po-paperprint/print/:nomor(.*)*",
-      name: "PoPaperprintPrint",
+      name: "PoPaperprintMmtPrint",
       component: () => import("@/views/mmt/transaksi/PoInternalPrintView.vue"),
       meta: {
         title: "Cetak PO Paperprint",
