@@ -659,7 +659,7 @@ const handlePrint = (row?: any) => {
   }
 
   router.push({
-    name: 'PoPaperprintPrint',
+    name: 'PoPaperprintMmtPrint',
     query: { nomor: targetRow.Nomor },
   });
 };
