@@ -46,6 +46,8 @@ const BAGIAN_PRODUKSI = [
 ];
 const BAGIAN_UMUM = [
   "GA",
+  "IT",
+  "TEKNISI",
   "FINANCE",
   "PEMBELIAN",
   "AUDIT",
