@@ -703,8 +703,8 @@ const validateSave = () => {
   const totalJumlah = validDtl.reduce((s, r) => s + Number(r.Jumlah), 0);
   const totalKoli = validDtl.reduce((s, r) => s + Number(r.Koli), 0);
 
-  if (totalKoli === 0) {
-    toast.warning("Qty Koli belum diisi.");
+  if (totalKoli <= 0) {
+    toast.warning("Total Qty Koli harus lebih dari 0.");
     return;
   }
   if (totalJumlah === 0) {
