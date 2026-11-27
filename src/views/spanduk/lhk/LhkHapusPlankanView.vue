@@ -112,8 +112,8 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
-  { header: "Nomor MAP", key: "Nomor_SPK", width: 20 },
-  { header: "Nama MAP", key: "Nama_SPK", width: 36 },
+  { header: "Nomor SPK/MAP", key: "Nomor_SPK", width: 20 },
+  { header: "Nama SPK/MAP", key: "Nama_SPK", width: 36 },
   {
     header: "Jumlah Order",
     key: "Jumlah_Order",
@@ -273,12 +273,12 @@ const numFmt = (v: number | null) =>
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
-        <div class="expand-title mb-2">Detail MAP - {{ item.Nomor }}</div>
+        <div class="expand-title mb-2">Detail SPK/MAP - {{ item.Nomor }}</div>
         <table class="detail-table">
           <thead>
             <tr>
-              <th width="130">Nomor MAP</th>
-              <th>Nama MAP</th>
+              <th width="130">Nomor SPK/MAP</th>
+              <th>Nama SPK/MAP</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
               <th width="80" class="tr">J Plangkan</th>

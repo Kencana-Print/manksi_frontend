@@ -21,6 +21,7 @@ export interface LhkAfdrukRow {
   Kaporit: number | null;
   Caustik: number | null;
   Ulano: number | null;
+  FotoEmulsi: number | null;
   Screen: number | null;
   Lem: number | null;
   Katalis: number | null;

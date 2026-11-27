@@ -208,6 +208,7 @@ const bahanExport = (item: LhkAfdrukRow, tampil: boolean): BahanExport => ({
   Kaporit: tampil ? item.Kaporit : null,
   Caustik: tampil ? item.Caustik : null,
   Ulano: tampil ? item.Ulano : null,
+  FotoEmulsi: tampil ? item.FotoEmulsi : null,
   Screen: tampil ? item.Screen : null,
   Lem: tampil ? item.Lem : null,
   Katalis: tampil ? item.Katalis : null,

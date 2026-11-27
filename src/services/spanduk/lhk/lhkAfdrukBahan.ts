@@ -1,4 +1,4 @@
-// Sembilan bahan tetap LHK Afdruk (satu sumber untuk form dan browse).
+// Sepuluh bahan tetap LHK Afdruk (satu sumber untuk form dan browse).
 // kode = tgarmen_brg.brg_kode (kategori SPANDUK); null = belum ada di master.
 // key = nama field di form, kolom = nama kolom di hasil browse backend.
 export const SLOT_BAHAN = [
@@ -8,6 +8,12 @@ export const SLOT_BAHAN = [
   { key: "kaporit", kolom: "Kaporit", label: "Kaporit", kode: "S0003" },
   { key: "caustik", kolom: "Caustik", label: "Caustik", kode: "S0001" },
   { key: "ulano", kolom: "Ulano", label: "Ulano", kode: "S0009" },
+  {
+    key: "fotoEmulsi",
+    kolom: "FotoEmulsi",
+    label: "Foto Emulsi",
+    kode: "S0010",
+  },
   { key: "screen", kolom: "Screen", label: "Screen", kode: "AK260278" },
   { key: "lem", kolom: "Lem", label: "Lem", kode: "S0006" },
   { key: "katalis", kolom: "Katalis", label: "Katalis", kode: "S0004" },

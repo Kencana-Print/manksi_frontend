@@ -285,10 +285,10 @@ const pilihRekapRows = (rows: RekapRow[]) => {
   if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
 
   let tambah = 0;
-  let perluCek = 0;
+
   rows.forEach((r) => {
     if (sudah.has(r.trs)) return;
-    if (r.cekRekening) perluCek++;
+
     formData.value.Detail.push({
       no: formData.value.Detail.length + 1,
       uraian: `Pembayaran voucher ${r.trs}`,
@@ -318,10 +318,6 @@ const pilihRekapRows = (rows: RekapRow[]) => {
     tambah++;
   });
   toast.success(`${tambah} voucher dari rekap ditambahkan.`);
-  if (perluCek > 0)
-    toast.warning(
-      `${perluCek} voucher perlu cek rekening (kosong atau lebih dari satu). Periksa lewat tombol Detail.`,
-    );
 };
 
 // ── Panggil Voucher langsung (tanpa Rekap) ──

@@ -153,6 +153,10 @@ const isSpanduk = computed(() =>
 const divisiOptions = computed(() =>
   isSpanduk.value ? DIVISI_SPANDUK : DIVISI_GARMEN,
 );
+// Garmen + Keterangan BARU: Pcs, Babaran, Jumlah dikunci dari MKB
+const qtyTerkunci = computed(
+  () => !isSpanduk.value && formData.value.keterangan === "BARU",
+);
 
 const fmtUkuran = (v: number | string | null | undefined) =>
   v === null || v === undefined || v === ""
@@ -239,6 +243,11 @@ const onSpkSelected = async (spk: any) => {
       formData.value.mkbNomor = data.mkbHeader.nomor;
       formData.value.mkbTanggal = data.mkbHeader.tanggal;
       formData.value.details = data.mkbDetails;
+    } else if (qtyTerkunci.value) {
+      formData.value.details = [];
+      toast.warning(
+        "SPK/MAP tsb belum punya MKB. Keterangan BARU tidak bisa dibuat tanpa MKB.",
+      );
     } else {
       formData.value.details = [
         {
@@ -303,6 +312,7 @@ const onBahanSelected = (item: BahanItem) => {
 };
 
 const calculateJumlah = (item: any) => {
+  if (qtyTerkunci.value) return;
   const pcs = Number(item.pcs) || 0;
   const babaran = Number(item.babaran) || 0;
   if (babaran === 0) return;
@@ -314,6 +324,8 @@ const calculateJumlah = (item: any) => {
 
 const validateBeforeSave = () => {
   if (!formData.value.spk) return toast.warning("Pilih SPK terlebih dahulu.");
+  if (qtyTerkunci.value && !formData.value.mkbNomor)
+    return toast.warning("SPK/MAP tsb belum punya MKB.");
   if (formData.value.details.some((d: DetailItem) => !d.kode || d.jumlah <= 0))
     return toast.warning("Lengkapi detail barang.");
   showSaveDialog.value = true;
@@ -569,6 +581,8 @@ watch(isSpanduk, (spandukBaru) => {
                     type="number"
                     v-model.number="item.babaran"
                     class="cell-input tr"
+                    :class="{ 'cell-ro': qtyTerkunci }"
+                    :readonly="qtyTerkunci"
                     @input="calculateJumlah(item)"
                     v-select-on-focus
                   />
@@ -578,6 +592,8 @@ watch(isSpanduk, (spandukBaru) => {
                     type="number"
                     v-model.number="item.pcs"
                     class="cell-input tr"
+                    :class="{ 'cell-ro': qtyTerkunci }"
+                    :readonly="qtyTerkunci"
                     @input="calculateJumlah(item)"
                     v-select-on-focus
                   />
@@ -587,6 +603,8 @@ watch(isSpanduk, (spandukBaru) => {
                     type="number"
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold"
+                    :class="{ 'cell-ro': qtyTerkunci }"
+                    :readonly="qtyTerkunci"
                     v-select-on-focus
                   />
                 </td>
@@ -622,6 +640,7 @@ watch(isSpanduk, (spandukBaru) => {
             size="x-small"
             color="primary"
             variant="flat"
+            :disabled="qtyTerkunci"
             @click="
               formData.details.push({
                 komponen: isSpanduk ? '' : 'BODY',
@@ -634,6 +653,9 @@ watch(isSpanduk, (spandukBaru) => {
             /></template>
             Tambah Baris
           </v-btn>
+          <span v-if="qtyTerkunci" class="text-caption text-grey-darken-1 ml-3">
+            Qty dikunci dari MKB (Keterangan BARU)
+          </span>
           <v-spacer />
           <div class="text-caption font-weight-bold">
             Total Qty:
@@ -725,6 +747,11 @@ watch(isSpanduk, (spandukBaru) => {
 }
 .cell-input:focus {
   background: #e3f2fd;
+}
+.cell-input.cell-ro,
+.cell-input.cell-ro:focus {
+  background: #eeeeee;
+  color: #555555;
 }
 .table-container {
   overflow: auto;

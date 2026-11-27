@@ -256,8 +256,8 @@ const openLookupSpk = (idx: number) => {
   showSpkModal.value = true;
 };
 
-// Isi satu baris dari nomor MAP. Data diambil server (sekaligus validasi MAP,
-// cabang, dan gerbang rantai). Mengembalikan true kalau baris berhasil terisi.
+// Isi satu baris dari nomor SPK/MAP.
+// Data diambil server (sekaligus validasi sumber, cabang, dan gerbang rantai). Mengembalikan true kalau baris berhasil terisi
 const isiBarisDariSpk = async (
   idx: number,
   nomorInput: string,
@@ -271,7 +271,7 @@ const isiBarisDariSpk = async (
     (r, i) => i !== idx && r.spk.toUpperCase() === nomor.toUpperCase(),
   );
   if (dup >= 0) {
-    toast.warning(`MAP sudah ada di baris ${dup + 1}`);
+    toast.warning(`SPK/MAP sudah ada di baris ${dup + 1}`);
     return false;
   }
 
@@ -283,16 +283,16 @@ const isiBarisDariSpk = async (
     row.jumlahOrder = num(info.Jumlah_Order);
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
-    row.plangkan = plangkanKosong(); // MAP baru: semua qty mulai dari 0
+    row.plangkan = plangkanKosong(); // semua qty mulai dari 0
     fokusIdx.value = idx;
     return true;
   } catch (e) {
-    toast.error(lhkForm.pesanError(e, "Gagal memuat data MAP."));
+    toast.error(lhkForm.pesanError(e, "Gagal memuat data SPK/MAP."));
     return false;
   }
 };
 
-// Urutan Enter: MAP → Qty ukuran (atas ke bawah) → Keterangan → MAP baris
+// Urutan Enter: SPK/MAP → Qty ukuran (atas ke bawah) → Keterangan → MAP baris
 // berikutnya (baris baru ditambah bila perlu)
 const fieldRefs = ref<Record<string, HTMLInputElement>>({});
 
@@ -371,7 +371,7 @@ const validateSave = () => {
     .map((r, i) => ({ r, no: i + 1 }))
     .filter(({ r }) => r.spk.trim() !== "");
   if (terisi.length === 0) {
-    toast.warning("Minimal satu baris MAP harus diisi.");
+    toast.warning("Minimal satu baris SPK/MAP harus diisi.");
     return;
   }
 
@@ -380,7 +380,7 @@ const validateSave = () => {
     const kunci = r.spk.trim().toUpperCase();
     const pertama = sudah.get(kunci);
     if (pertama !== undefined) {
-      toast.warning(`Baris ${no}: MAP sama dengan baris ${pertama}.`);
+      toast.warning(`Baris ${no}: SPK/MAP sama dengan baris ${pertama}.`);
       return;
     }
     sudah.set(kunci, no);
@@ -491,7 +491,7 @@ const tutupSetelahSimpan = () => {
     <template #right-column>
       <div class="lhk-right">
         <div class="tbl-header">
-          <span class="tbl-title">Rincian MAP</span>
+          <span class="tbl-title">Rincian SPK / MAP</span>
           <button type="button" class="btn-add" @click="addRow">
             + Tambah Baris
           </button>
@@ -501,7 +501,7 @@ const tutupSetelahSimpan = () => {
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
-                <th style="width: 160px">Nomor MAP</th>
+                <th style="width: 160px">Nomor SPK / MAP</th>
                 <th style="width: 220px">Nama Order</th>
                 <th style="width: 70px" class="tr">Panjang</th>
                 <th style="width: 70px" class="tr">Lebar</th>
@@ -534,7 +534,7 @@ const tutupSetelahSimpan = () => {
                     <button
                       type="button"
                       class="ci-btn"
-                      title="Cari MAP"
+                      title="Cari SPK/MAP"
                       @click="openLookupSpk(idx)"
                     >
                       <IconSearch :size="11" />
@@ -641,7 +641,7 @@ const tutupSetelahSimpan = () => {
           </div>
 
           <div v-else class="plg-kosong">
-            Pilih MAP pada tabel di atas untuk mengisi detail plangkan.
+            Pilih SPK/MAP pada tabel di atas untuk mengisi detail plangkan.
           </div>
         </div>
       </div>

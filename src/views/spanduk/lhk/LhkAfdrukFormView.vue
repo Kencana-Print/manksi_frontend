@@ -69,12 +69,13 @@ const qtyBahanKosong = (): QtyBahan => ({
   kaporit: 0,
   caustik: 0,
   ulano: 0,
+  fotoEmulsi: 0,
   screen: 0,
   lem: 0,
   katalis: 0,
 });
 
-// Bahan lain di luar sembilan slot tidak ditampilkan (lihat catatan risiko)
+// Bahan lain di luar slot SLOT_BAHAN tidak ditampilkan (lihat catatan risiko)
 const bahanDariServer = (daftar: LhkAfdrukBahan[]): QtyBahan => {
   const hasil = qtyBahanKosong();
   for (const s of SLOT_BAHAN) {
