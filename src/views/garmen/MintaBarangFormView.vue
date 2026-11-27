@@ -84,13 +84,15 @@ const formatDateLocal = (value?: string | Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeCabang = (cab?: string) => (cab === "HO" ? "HO-" : cab || "");
+
 // Initial Data Structure (Tambah field Jumlah, Divisi, MKA)
 const MINTA_KE_DEFAULT: Record<string, string> = { P02: "P04" };
 
 const mintaKeOptions = [
   { title: "P04 (Garmen)", value: "P04" },
   { title: "P05 (MMT)", value: "P05" },
-  { title: "HO", value: "HO" },
+  { title: "HO", value: "HO-" },
   { title: "P01", value: "P01" },
   { title: "P02", value: "P02" },
   { title: "P03", value: "P03" },
@@ -101,9 +103,10 @@ const initialData = {
   tanggal: formatDateLocal(new Date()),
   jenis: jenisFromParam.value || "ACCESORIES",
   cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
-  mintaKe:
+  mintaKe: normalizeCabang(
     MINTA_KE_DEFAULT[authStore.userCabang || ""] ||
-    (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04"),
+      (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04"),
+  ),
   gudangPeminta: "",
   namaGudangPeminta: "",
   spk: "",
@@ -169,9 +172,10 @@ const {
     showPrintDialog.value = false;
     savedNomor.value = "";
     detailFieldRefs.value = {};
-    previousMintaKe.value =
+    previousMintaKe.value = normalizeCabang(
       MINTA_KE_DEFAULT[authStore.userCabang || ""] ||
-      (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04");
+        (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04"),
+    );
   },
   fetchApi: async () => {
     const res = await mintaBarangFormService.getDetail(nomorParam.value);
@@ -182,13 +186,14 @@ const {
       tanggal: formatDateLocal(header.min_tanggal),
       jenis: header.min_jenis,
       cabang: header.min_cab,
-      mintaKe:
+      mintaKe: normalizeCabang(
         header.min_mintake ||
-        header.min_cab_tujuan ||
-        header.min_tujuan ||
-        MINTA_KE_DEFAULT[header.min_cab] ||
-        header.min_cab ||
-        "P04",
+          header.min_cab_tujuan ||
+          header.min_tujuan ||
+          MINTA_KE_DEFAULT[header.min_cab] ||
+          header.min_cab ||
+          "P04",
+      ),
       gudangPeminta: header.min_gp,
       namaGudangPeminta: header.nama_gdg,
       spk: header.min_spk_nomor,
@@ -254,16 +259,17 @@ onMounted(() => {
     }
 
     if (!formData.value.mintaKe) {
-      formData.value.mintaKe =
+      formData.value.mintaKe = normalizeCabang(
         MINTA_KE_DEFAULT[formData.value.cabang] ||
-        (formData.value.cabang === "ALL" ? "P04" : formData.value.cabang || "P04");
+          (formData.value.cabang === "ALL" ? "P04" : formData.value.cabang || "P04"),
+      );
       previousMintaKe.value = formData.value.mintaKe;
     }
   }
 });
 
-const targetCabang = computed(
-  () => formData.value.mintaKe || formData.value.cabang || "P04",
+const targetCabang = computed(() =>
+  normalizeCabang(formData.value.mintaKe || formData.value.cabang || "P04"),
 );
 
 const previousMintaKe = ref(initialData.mintaKe);
@@ -639,6 +645,7 @@ const onBarangEnter = async (index: number) => {
       formData.value.jenis,
       targetCabang.value,
       authStore.user?.bagian || "",
+      true,
     );
     const item = res.data.data;
     const isDuplicate = formData.value.details.some(
@@ -1160,6 +1167,7 @@ const numFormat = (val: any) =>
     v-model="showBarangModal"
     :jenis="formData.jenis"
     :cabang="targetCabang"
+    filter-by-cabang
     multiple
     @selected="onBarangSelected"
     @selected-multiple="onBarangMultiSelected"

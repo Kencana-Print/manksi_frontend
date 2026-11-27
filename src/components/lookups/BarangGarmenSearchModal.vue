@@ -3,13 +3,19 @@ import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import { IconPackage, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
-const props = defineProps<{
-  modelValue: boolean;
-  jenis: string;
-  cabang: string;
-  initialKeyword?: string;
-  multiple?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean;
+    jenis: string;
+    cabang: string;
+    initialKeyword?: string;
+    multiple?: boolean;
+    filterByCabang?: boolean;
+  }>(),
+  {
+    filterByCabang: false,
+  },
+);
 const emit = defineEmits([
   "update:modelValue",
   "selected",
@@ -86,6 +92,7 @@ const fetchData = async () => {
         cabang: props.cabang,
         page: currentPage.value,
         limit: perPage.value,
+        ...(props.filterByCabang ? { filterByCabang: 1 } : {}),
       },
     });
     items.value = res.data.data.items;

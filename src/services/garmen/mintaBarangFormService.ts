@@ -21,10 +21,18 @@ export const mintaBarangFormService = {
     jenis: string,
     cabang?: string,
     bagian?: string,
+    filterByCabang?: boolean,
   ) =>
     api.get(
       `/garmen/barang/permintaan/form/barang/${encodeURIComponent(kode)}`,
-      { params: { jenis, cabang, bagian } },
+      {
+        params: {
+          jenis,
+          cabang,
+          bagian,
+          ...(filterByCabang ? { filterByCabang: 1 } : {}),
+        },
+      },
     ),
 
   saveData(payload: any) {
