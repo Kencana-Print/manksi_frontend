@@ -106,6 +106,7 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Account", key: "Account", width: "180px" },
   { title: "Penerima", key: "Penerima", width: "180px" },
+  { title: "Supplier", key: "Supplier", width: "200px" },
   { title: "Nota", key: "Nota", width: "130px" },
   { title: "Keterangan", key: "Keterangan", width: "220px" },
   { title: "Nominal", key: "Nominal", width: "130px", align: "end" },
@@ -241,6 +242,7 @@ const detailExportColumns: ExcelColumn[] = [
   { header: "Account Header", key: "HeaderAccount", width: 22 },
   { header: "No", key: "No", width: 6, align: "center" },
   { header: "Uraian", key: "Uraian", width: 28 },
+  { header: "Supplier", key: "Supplier", width: 24 },
   { header: "Account", key: "Account", width: 14 },
   { header: "Nama Account", key: "NamaAccount", width: 22 },
   { header: "Detail CC", key: "DetailCC", width: 18 },
@@ -293,6 +295,7 @@ const onExportDetail = async () => {
         Closed: m.Closed || "",
         No: d.No,
         Uraian: d.Uraian,
+        Supplier: d.Supplier || "",
         Account: d.Account,
         NamaAccount: d.NamaAccount,
         DetailCC: d.DetailCC,
@@ -431,6 +434,7 @@ const onExportDetail = async () => {
             <tr>
               <th width="50">No</th>
               <th>Uraian</th>
+              <th width="180">Supplier</th>
               <th width="100">Account</th>
               <th width="180">Nama Account</th>
               <th width="150">Detail CC</th>
@@ -444,6 +448,7 @@ const onExportDetail = async () => {
             >
               <td>{{ d.No }}</td>
               <td>{{ d.Uraian }}</td>
+              <td>{{ d.Supplier }}</td>
               <td>{{ d.Account }}</td>
               <td>{{ d.NamaAccount }}</td>
               <td>{{ d.DetailCC }}</td>
@@ -455,7 +460,7 @@ const onExportDetail = async () => {
                 detailCache[(item.raw || item).Nomor].length === 0
               "
             >
-              <td colspan="6" class="text-center text-grey py-4 font-italic">
+              <td colspan="7" class="text-center text-grey py-4 font-italic">
                 Data detail jurnal tidak ditemukan.
               </td>
             </tr>
