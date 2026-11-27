@@ -172,7 +172,7 @@ const cetak = () => window.print();
       </v-btn>
       <v-btn size="small" color="indigo" @click="cetak"> Cetak </v-btn>
       <span v-if="validasi && !validasi.berlaku" class="toolbar-note">
-        E-validasi hanya untuk cabang HO-/P01.
+        E-validasi hanya untuk cabang HO-/P01/P04.
       </span>
     </div>
 

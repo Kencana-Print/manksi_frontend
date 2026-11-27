@@ -6,7 +6,7 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { uangMukaService } from "@/services/pembelian/uangMukaService";
 import { pengajuanUangMukaService } from "@/services/pembelian/pengajuanUangMukaService";
-const CABANG_VALIDASI = ["HO-", "P01"];
+const CABANG_VALIDASI = ["HO-", "P01", "P04"];
 import { uangMukaPenyelesaianFormService } from "@/services/pembelian/uangMukaPenyelesaianFormService";
 import { uangMukaRealisasiService } from "@/services/pembelian/uangMukaRealisasiService";
 import { exportExcelSingle } from "@/utils/excelExport";
