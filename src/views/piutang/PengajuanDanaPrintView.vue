@@ -78,6 +78,12 @@ onMounted(async () => {
 const grandTotal = computed(
   () => dataPO.value?.items.reduce((s: number, r: any) => s + r.total, 0) || 0,
 );
+const isUrgent = computed(
+  () =>
+    String(dataPO.value?.header?.Priority ?? "")
+      .trim()
+      .toLowerCase() === "urgent",
+);
 </script>
 
 <template>
@@ -93,7 +99,7 @@ const grandTotal = computed(
             <td width="90">No.Pengajuan</td>
             <td width="10">:</td>
             <td width="200">{{ dataPO.header.Nomor }}</td>
-            <td width="70">Nama</td>
+            <td width="110">Nama</td>
             <td width="10">:</td>
             <td>{{ dataPO.header.Nama }}</td>
           </tr>
@@ -117,9 +123,17 @@ const grandTotal = computed(
             <td>Cost Center</td>
             <td>:</td>
             <td>{{ dataPO.header.CcNama }}</td>
-            <td>Detail CC</td>
+            <td>Status Permintaan</td>
             <td>:</td>
-            <td>{{ dataPO.header.CcDcNama }}</td>
+            <td :class="{ fw: isUrgent }">
+              {{ isUrgent ? "Urgent" : "Tidak Urgent" }}
+            </td>
+          </tr>
+          <tr>
+            <td>Pengajuan Ke</td>
+            <td>:</td>
+            <td>{{ dataPO.header.PjhKe }}</td>
+            <td colspan="3"></td>
           </tr>
         </table>
       </div>
