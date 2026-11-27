@@ -6,8 +6,21 @@
   <v-snackbar v-model="needRefresh" :timeout="-1" location="bottom">
     Versi baru tersedia.
     <template #actions>
-      <v-btn variant="text" @click="updateServiceWorker(true)">Update</v-btn>
-      <v-btn variant="text" @click="needRefresh = false">Nanti</v-btn>
+      <v-btn
+        variant="text"
+        :loading="isUpdating"
+        :disabled="isUpdating"
+        @click="updateServiceWorker(true)"
+      >
+        Update
+      </v-btn>
+      <v-btn
+        variant="text"
+        :disabled="isUpdating"
+        @click="needRefresh = false"
+      >
+        Nanti
+      </v-btn>
     </template>
   </v-snackbar>
 
@@ -39,5 +52,5 @@ const layout = computed(() => {
   return layouts[layoutName] || DefaultLayout;
 });
 
-const { needRefresh, offlineReady, updateServiceWorker } = usePwaUpdate();
+const { needRefresh, offlineReady, isUpdating, updateServiceWorker } = usePwaUpdate();
 </script>
