@@ -94,19 +94,14 @@ const isUrgent = computed(
         <td>{{ dataPO.header.Lokasi }}</td>
       </tr>
       <tr>
-        <td>Cost Center</td>
+        <td>Pengajuan Ke</td>
         <td>:</td>
-        <td>{{ dataPO.header.CcNama }}</td>
+        <td>{{ dataPO.header.PjhKe }}</td>
         <td>Status Permintaan</td>
         <td>:</td>
         <td :class="{ fw: isUrgent }">
           {{ isUrgent ? "Urgent" : "Tidak Urgent" }}
         </td>
-      </tr>
-      <tr>
-        <td>Pengajuan Ke</td>
-        <td>:</td>
-        <td colspan="4">{{ dataPO.header.PjhKe }}</td>
       </tr>
       <tr>
         <td>Keterangan</td>

@@ -92,36 +92,83 @@ const formatCurrency = (val: number) =>
     maximumFractionDigits: 2,
   }).format(val);
 
-// Format angka dengan separator ribuan untuk display
-const formatHarga = (val: any) => {
-  if (val === null || val === undefined || val === "") return "";
-  return new Intl.NumberFormat("id-ID").format(Number(val) || 0);
+// Angka gaya id-ID: "." pemisah ribuan, "," desimal
+const bulat = (n: number, desimal: number) =>
+  Math.round(n * 10 ** desimal) / 10 ** desimal;
+
+const parseAngka = (raw: string): number | null => {
+  const s = raw.replace(/\./g, "").replace(",", ".").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
 };
 
-// Saat input harga — simpan nilai mentah ke item, recalc total
+const toEditText = (v: number | null | undefined) =>
+  v === null || v === undefined ? "" : String(v).replace(".", ",");
+
+const formatHarga = (val: any) => {
+  if (val === null || val === undefined || val === "") return "";
+  return new Intl.NumberFormat("id-ID", { maximumFractionDigits: 4 }).format(
+    Number(val) || 0,
+  );
+};
+
+// Teks yang sedang diketik disimpan di hargaEdit/totalEdit supaya koma
+// tidak hilang saat di-render ulang; null = tampilkan versi terformat.
 const onHargaInput = (e: Event, idx: number) => {
-  const raw = (e.target as HTMLInputElement).value
-    .replace(/\./g, "")
-    .replace(/,/g, "")
-    .trim();
-  formData.value.items[idx].harga = raw === "" ? null : Number(raw) || 0;
+  const row = formData.value.items[idx];
+  const raw = (e.target as HTMLInputElement).value;
+  row.hargaEdit = raw;
+  const n = parseAngka(raw);
+  row.harga = n === null ? null : bulat(n, 4);
   recalcTotal(idx);
 };
 
-// Saat focus — tampilkan angka polos tanpa separator
 const onHargaFocus = (e: Event, idx: number) => {
   const input = e.target as HTMLInputElement;
-  const h = formData.value.items[idx].harga;
-  input.value = h === null || h === undefined ? "" : String(h);
+  const row = formData.value.items[idx];
+  const teks = toEditText(row.harga);
+  input.value = teks;
+  row.hargaEdit = teks;
   input.select();
 };
 
-// Saat blur — format ulang dengan separator
 const onHargaBlur = (e: Event, idx: number) => {
-  const input = e.target as HTMLInputElement;
-  input.value = formatHarga(formData.value.items[idx].harga);
+  const row = formData.value.items[idx];
+  row.hargaEdit = null;
+  (e.target as HTMLInputElement).value = formatHarga(row.harga);
 };
 
+// Total diisi langsung → harga menyesuaikan (total / qty, 4 desimal)
+const onTotalInput = (e: Event, idx: number) => {
+  const row = formData.value.items[idx];
+  const raw = (e.target as HTMLInputElement).value;
+  row.totalEdit = raw;
+  const n = parseAngka(raw);
+  row.total = n === null ? 0 : bulat(n, 2);
+  const qty = Number(row.jumlah) || 0;
+  if (n !== null && qty > 0) {
+    row.harga = bulat(row.total / qty, 4);
+    row.hargaEdit = null;
+  }
+};
+
+const onTotalFocus = (e: Event, idx: number) => {
+  const input = e.target as HTMLInputElement;
+  const row = formData.value.items[idx];
+  const teks = toEditText(Number(row.total) || 0);
+  input.value = teks;
+  row.totalEdit = teks;
+  input.select();
+};
+
+const onTotalBlur = (e: Event, idx: number) => {
+  const row = formData.value.items[idx];
+  const kosong = !String(row.totalEdit ?? "").trim();
+  row.totalEdit = null;
+  if (kosong) recalcTotal(idx); // total dikosongkan → kembali dari harga × qty
+  (e.target as HTMLInputElement).value = formatCurrency(Number(row.total) || 0);
+};
 // Enter di kolom Harga → pindah ke Harga baris berikutnya yang bisa diedit
 const onHargaEnter = (e: KeyboardEvent) => {
   const inputs = Array.from(
@@ -197,7 +244,7 @@ const {
         bpb: item.bpb,
         jumlah: item.jumlah,
         harga: item.harga,
-        total: (Number(item.jumlah) || 0) * (Number(item.harga) || 0),
+        total: bulat((Number(item.jumlah) || 0) * (Number(item.harga) || 0), 2),
       })),
     };
   },
@@ -330,7 +377,7 @@ const onSupEnter = async () => {
 
 const recalcTotal = (idx: number) => {
   const row = formData.value.items[idx];
-  row.total = (Number(row.jumlah) || 0) * (Number(row.harga) || 0);
+  row.total = bulat((Number(row.jumlah) || 0) * (Number(row.harga) || 0), 2);
 };
 
 // --- VALIDATION BEFORE SAVE (1:1 Delphi Logic) ---
@@ -585,12 +632,12 @@ const onPrintCancel = () => {
                 </th>
                 <th
                   v-if="canSeeBeli"
-                  style="width: 100px; background: #ffeb3b"
+                  style="width: 110px; background: #ffeb3b"
                   class="text-right text-dark"
                 >
                   Harga
                 </th>
-                <th v-if="canSeeBeli" style="width: 110px" class="text-right">
+                <th v-if="canSeeBeli" style="width: 130px" class="text-right">
                   Total
                 </th>
                 <th v-if="isDetailRinci" style="min-width: 130px">
@@ -656,9 +703,9 @@ const onPrintCancel = () => {
                 </td>
                 <td v-if="canSeeBeli" class="p0">
                   <input
-                    :value="formatHarga(item.harga)"
+                    :value="item.hargaEdit ?? formatHarga(item.harga)"
                     type="text"
-                    inputmode="numeric"
+                    inputmode="decimal"
                     class="ci text-right harga-inp"
                     :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
                     :readonly="item.bpb > 0 || formData.header.isTutupBuku"
@@ -668,11 +715,21 @@ const onPrintCancel = () => {
                     @keydown.enter.prevent="onHargaEnter"
                   />
                 </td>
-                <td
-                  v-if="canSeeBeli"
-                  class="text-right px-2 font-weight-bold text-error ro"
-                >
-                  {{ formatQty(item.total) }}
+                <td v-if="canSeeBeli" class="p0">
+                  <input
+                    :value="
+                      item.totalEdit ?? formatCurrency(Number(item.total) || 0)
+                    "
+                    type="text"
+                    inputmode="decimal"
+                    class="ci text-right font-weight-bold text-error"
+                    :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
+                    :readonly="item.bpb > 0 || formData.header.isTutupBuku"
+                    title="Isi total sesungguhnya, harga dihitung otomatis (maks. 4 desimal)"
+                    @focus="onTotalFocus($event, Number(idx))"
+                    @blur="onTotalBlur($event, Number(idx))"
+                    @input="onTotalInput($event, Number(idx))"
+                  />
                 </td>
 
                 <td v-if="isDetailRinci" class="p0">

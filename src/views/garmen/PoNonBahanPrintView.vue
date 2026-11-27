@@ -30,6 +30,8 @@ const formatDateDisplay = (val: string) => {
 };
 const fmt = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+const fmtHarga = (val: any) =>
+  Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
 
 const fetchData = async () => {
   try {
@@ -59,7 +61,7 @@ const fetchData = async () => {
       const qty = Number(item.pod_jumlah ?? item.jumlah ?? 0);
       const harga = Number(item.pod_harga ?? item.harga ?? 0);
       const ppnPct = master.value.ppn;
-      const subtotal = qty * harga;
+      const subtotal = Math.round(qty * harga * 100) / 100;
       return {
         kode: item.pod_brg_kode || item.Kode,
         nama: item.namaExt || item.Nama,
@@ -145,7 +147,7 @@ onMounted(fetchData);
               <span class="qty-n">{{ fmt(it.qty) }}</span>
               <span class="qty-u">{{ it.satuan }}</span>
             </td>
-            <td class="tr">{{ fmt(it.harga) }}</td>
+            <td class="tr">{{ fmtHarga(it.harga) }}</td>
             <td class="tr">
               <div>{{ fmt(it.subtotal) }}</div>
             </td>

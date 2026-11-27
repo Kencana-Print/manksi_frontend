@@ -99,16 +99,30 @@ const showFilterSparepart = computed(() =>
   ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  ["GA", "IT", "TEKNISI", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
-    userBagian.value,
-  ),
+  [
+    "GA",
+    "IT",
+    "TEKNISI",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "EDP",
+    ...BAGIAN_PEMBELIAN,
+  ].includes(userBagian.value),
 );
 
 // Bagian yang boleh melihat PO Aset; samakan dengan BAGIAN_PO_ASET di backend
 const showFilterAset = computed(() =>
-  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", "IT", "TEKNISI", ...BAGIAN_PEMBELIAN].includes(
-    userBagian.value,
-  ),
+  [
+    "GA",
+    "EDP",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "IT",
+    "TEKNISI",
+    ...BAGIAN_PEMBELIAN,
+  ].includes(userBagian.value),
 );
 // Jenis yang memakai kolom Spesifikasi dan Kegunaan
 const JENIS_RINCI = ["SPAREPART", "ATK/RTK", "ASET"];
@@ -367,6 +381,13 @@ const formatQty = (val: any) => {
   });
 };
 
+const formatHarga = (val: any) => {
+  return Number(val || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+};
+
 // ── PEWARNAAN BARIS (Migrasi cxGrdMasterCustomDrawCell Delphi) ──
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
@@ -604,7 +625,7 @@ const rowPropsFn = (data: any) => {
                     <th style="width: 80px" class="text-right">Qty BPB</th>
                     <th
                       v-if="canLihatBeli"
-                      style="width: 100px"
+                      style="width: 110px"
                       class="text-right"
                     >
                       Harga
@@ -645,7 +666,7 @@ const rowPropsFn = (data: any) => {
                       {{ formatQty(dtl.QtyBpb) }}
                     </td>
                     <td v-if="canLihatBeli" class="text-right">
-                      {{ formatQty(dtl.Harga) }}
+                      {{ formatHarga(dtl.Harga) }}
                     </td>
                     <td v-if="canLihatBeli" class="text-right">
                       {{ Number(dtl.Ppn) ? Number(dtl.Ppn) + "%" : "-" }}
