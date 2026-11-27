@@ -161,6 +161,8 @@ const printWithAlokasi = ref(false);
 const hasAlokasi = ref(false);
 
 const showApproveDialog = ref(false);
+const approveKeterangan = ref("");
+const initialApproveKeterangan = ref("");
 const showBatalCloseDialog = ref(false);
 
 const {
@@ -505,12 +507,21 @@ const pilihCetakHorizontal = () => {
 
 const openApproveDialog = () => {
   if (!selectedItem.value) return;
+  const ket = selectedItem.value.Keterangan || "";
+  approveKeterangan.value = ket;
+  initialApproveKeterangan.value = ket;
   showApproveDialog.value = true;
 };
 
 const confirmApprove = async () => {
   try {
-    await salesOrderService.approveCmo(selectedItem.value.Nomor);
+    const currentKet = approveKeterangan.value ?? "";
+    const keteranganPayload =
+      currentKet !== initialApproveKeterangan.value ? currentKet : undefined;
+    await salesOrderService.approveCmo(
+      selectedItem.value.Nomor,
+      keteranganPayload,
+    );
     toast.success("SO berhasil di-approve.");
     showApproveDialog.value = false;
     fetchData();
@@ -1792,7 +1803,7 @@ const submitRevisiPin = async () => {
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="showApproveDialog" max-width="380px" persistent>
+  <v-dialog v-model="showApproveDialog" max-width="460px" persistent>
     <v-card rounded="lg">
       <v-card-title
         class="bg-success text-white pa-3 text-subtitle-1 d-flex align-center"
@@ -1805,7 +1816,17 @@ const submitRevisiPin = async () => {
         <div class="font-weight-bold text-primary mt-1">
           {{ selectedItem?.Nomor }}
         </div>
-        <div class="text-caption text-grey mt-1">{{ selectedItem?.Nama }}</div>
+        <div class="text-caption text-grey mt-1 mb-3">{{ selectedItem?.Nama }}</div>
+        <v-textarea
+          v-model="approveKeterangan"
+          label="Keterangan Produksi (Opsional)"
+          placeholder="Tambahkan atau ubah keterangan jika perlu..."
+          variant="outlined"
+          density="compact"
+          rows="3"
+          hide-details
+          clearable
+        />
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
         <v-spacer />

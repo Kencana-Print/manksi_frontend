@@ -36,8 +36,10 @@ export const salesOrderService = {
   // Ambil list workshop untuk dropdown filter
   getWorkshops: () => api.get("/lookups/workshop"),
 
-  approveCmo: (nomor: string) =>
-    api.put(`/penjualan/sales-order/${encodeURIComponent(nomor)}/approve`),
+  approveCmo: (nomor: string, keterangan?: string) =>
+    api.put(`/penjualan/sales-order/${encodeURIComponent(nomor)}/approve`, {
+      keterangan,
+    }),
 
   getPendingDesigns: (params: { startDate: string; endDate: string }) =>
     api.get("/penjualan/sales-order/pending-design", { params }),
