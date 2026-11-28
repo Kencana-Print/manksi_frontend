@@ -3060,8 +3060,7 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
-      alias:
-        "/garmen/makloon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
+      alias: "/garmen/makloon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
       name: "MaklonGabunganPrint",
       component: () => import("@/views/garmen/MaklonGabunganPrintView.vue"),
       meta: {
@@ -8805,6 +8804,18 @@ const router = createRouter({
         menuId: "969",
       },
     },
+    {
+      path: "/laporan/pembelian/po-outstanding",
+      name: "LaporanPembelianPoOutstanding",
+      component: () =>
+        import("@/views/laporan/pembelian/PoOutstandingView.vue"),
+      meta: {
+        title: "PO Outstanding",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "975",
+      },
+    },
 
     // ── Tools ───────────────────────────────────────────────────
     {
@@ -8980,7 +8991,7 @@ router.beforeEach((to, _from) => {
   if (to.meta.menuId) {
     const ids = [
       String(to.meta.menuId),
-      ...(((to.meta.altMenuIds as string[]) || []).map(String)),
+      ...((to.meta.altMenuIds as string[]) || []).map(String),
     ];
     if (!ids.some((id) => authStore.can(id, "view"))) {
       return { name: "Unauthorized", query: { from: to.fullPath } };

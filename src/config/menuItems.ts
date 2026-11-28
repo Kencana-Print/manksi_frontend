@@ -2455,6 +2455,18 @@ export const createMenuItems = (): NavItem[] => {
             },
           ],
         },
+        {
+          title: "Laporan Purchasing",
+          icon: IconShoppingCart,
+          menuId: 975,
+          subItems: [
+            {
+              title: "PO Outstanding",
+              to: "/laporan/pembelian/po-outstanding",
+              icon: IconClipboardList,
+            },
+          ],
+        },
       ],
     },
     {
@@ -2591,7 +2603,8 @@ export const createMenuItems = (): NavItem[] => {
   // Bersihkan folder pembungkus "Maklon Barang" di Garmen jika sudah kosong
   cabut(
     garmen.items,
-    (i) => i.title === "Maklon Barang" && (!i.subItems || i.subItems.length === 0),
+    (i) =>
+      i.title === "Maklon Barang" && (!i.subItems || i.subItems.length === 0),
     "Maklon Barang (Parent Garmen)",
   );
 
