@@ -24,7 +24,9 @@ const ready = ref(false);
 const printFormat = ref<PrintFormat>("spanduk");
 const containerEl = ref<HTMLElement | null>(null);
 const iframeEl = ref<HTMLIFrameElement | null>(null);
-const contentHeight = ref(1123);
+const MIN_HEIGHT = 200;
+const contentHeight = ref(MIN_HEIGHT);
+const sized = ref(false);
 const scale = ref(1);
 const manualZoom = ref<number | null>(null);
 let resizeObserver: ResizeObserver | null = null;
@@ -96,7 +98,8 @@ const onWheel = (e: WheelEvent) => {
 const onMessage = (e: MessageEvent) => {
   if (e.source !== iframeEl.value?.contentWindow) return;
   if (e.data?.type === "spk-print-ready" && typeof e.data.height === "number") {
-    contentHeight.value = e.data.height > 0 ? e.data.height : 1123;
+    contentHeight.value = e.data.height > MIN_HEIGHT ? e.data.height : 1123;
+    sized.value = true;
     recompute();
   }
 };
@@ -127,7 +130,8 @@ watch(
     }
     window.addEventListener("message", onMessage);
     window.addEventListener("keydown", blokirCetak, true);
-    contentHeight.value = 1123;
+    contentHeight.value = MIN_HEIGHT;
+    sized.value = false;
     manualZoom.value = null;
     ready.value = false;
     try {
@@ -202,6 +206,7 @@ onBeforeUnmount(lepas);
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
             flexShrink: 0,
+            visibility: sized ? 'visible' : 'hidden',
           }"
         >
           <iframe
