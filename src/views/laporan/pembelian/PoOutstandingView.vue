@@ -55,6 +55,7 @@ const headers: HeaderDef[] = [
   { title: "Nomor PO", key: "Nomor", width: "150px", fixed: true },
   { title: "Tipe", key: "Tipe", width: "90px" },
   { title: "Jenis", key: "Jenis", width: "100px" },
+  { title: "Kode Supp", key: "KodeSupplier", width: "90px" },
   { title: "Supplier", key: "Supplier", width: "200px" },
   { title: "Kode", key: "Kode", width: "110px" },
   { title: "Nama", key: "Nama", width: "280px" },
@@ -104,12 +105,19 @@ const rowPropsFn = (data: unknown) => {
   return {};
 };
 
-// ── Summary footer (satuan campur, jadi hanya hitung baris & PO) ──
+// ── Summary footer: hanya kolom qty ──
+const sumQty = (
+  rows: PoOutstandingRow[],
+  key: "QtyPo" | "QtyTerima" | "Sisa",
+) =>
+  numFmt(
+    Math.round(rows.reduce((s, r) => s + (Number(r[key]) || 0), 0) * 100) / 100,
+  );
+
 const summaryFormatters = {
-  Nama: (rows: PoOutstandingRow[]) => {
-    const jumlahPo = new Set(rows.map((r) => r.Nomor)).size;
-    return `TOTAL: ${rows.length} baris · ${jumlahPo} PO`;
-  },
+  QtyPo: (rows: PoOutstandingRow[]) => sumQty(rows, "QtyPo"),
+  QtyTerima: (rows: PoOutstandingRow[]) => sumQty(rows, "QtyTerima"),
+  Sisa: (rows: PoOutstandingRow[]) => sumQty(rows, "Sisa"),
 };
 
 // ── Export ──
@@ -183,7 +191,7 @@ const onExport = async () => {
     :can-export="true"
     item-value="id"
     :row-props-fn="rowPropsFn"
-    :summary-columns="['Nama']"
+    :summary-columns="['QtyPo', 'QtyTerima', 'Sisa']"
     :summary-formatters="summaryFormatters"
     @refresh="fetchData"
     @export="onExport"

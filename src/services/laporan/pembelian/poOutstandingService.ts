@@ -9,6 +9,7 @@ export interface PoOutstandingRow {
   Nomor: string;
   Tanggal: string;
   Umur: number;
+  KodeSupplier: string;
   Supplier: string;
   Kode: string;
   Nama: string;
