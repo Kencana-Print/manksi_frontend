@@ -27,6 +27,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggalSingkat as formatTanggal } from "@/utils/dateFormat";
 import TanggalInput from "@/components/TanggalInput.vue";
+import SpkPreviewModal from "@/components/ppic/SpkPreviewModal.vue";
 
 const authStore = useAuthStore();
 const toast = useToast();
@@ -1400,6 +1401,72 @@ const rowClass = (d: DetailRow) => {
   if (Number(d.Kurang) <= 0) return "row-done";
   return "";
 };
+
+// ── Filter & cari (client-side, tidak mengubah `detail`) ──
+const filter = reactive({
+  cari: "",
+  dlDari: "",
+  dlSampai: "",
+  kspDari: "",
+  kspSampai: "",
+  kspKosong: false,
+});
+
+const tgl10 = (v: unknown): string => (v ? String(v).substring(0, 10) : "");
+
+const filterAktif = computed(
+  () =>
+    !!filter.cari.trim() ||
+    !!filter.dlDari ||
+    !!filter.dlSampai ||
+    !!filter.kspDari ||
+    !!filter.kspSampai ||
+    filter.kspKosong,
+);
+
+const resetFilter = () => {
+  filter.cari = "";
+  filter.dlDari = "";
+  filter.dlSampai = "";
+  filter.kspDari = "";
+  filter.kspSampai = "";
+  filter.kspKosong = false;
+};
+
+const filteredDetail = computed(() => {
+  const q = filter.cari.trim().toLowerCase();
+  return visibleDetail.value.filter((d) => {
+    // Baris baru yang belum tersimpan tidak boleh hilang saat diketik
+    if (d.PjwdId == null) return true;
+
+    if (q) {
+      const hay = [d.SpkRef, d.SoNomor, d.MapNomor, d.NomorPraOrder, d.Nama]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+
+    const dl = tgl10(d.PermintaanKirim);
+    if (filter.dlDari && (!dl || dl < filter.dlDari)) return false;
+    if (filter.dlSampai && (!dl || dl > filter.dlSampai)) return false;
+
+    const ksp = tgl10(d.Kesepakatan);
+    if (filter.kspKosong) return !ksp;
+    if (filter.kspDari && (!ksp || ksp < filter.kspDari)) return false;
+    if (filter.kspSampai && (!ksp || ksp > filter.kspSampai)) return false;
+
+    return true;
+  });
+});
+
+// ── Preview SPK ──
+const showSpkPreview = ref(false);
+const spkPreviewNomor = ref("");
+const bukaPreviewSpk = (nomor: string) => {
+  spkPreviewNomor.value = nomor;
+  showSpkPreview.value = true;
+};
 </script>
 
 <template>
@@ -1604,6 +1671,48 @@ const rowClass = (d: DetailRow) => {
         >
       </div>
 
+      <div class="pjw-filter">
+        <input
+          v-model="filter.cari"
+          type="text"
+          class="pjw-inp pjw-filter-cari"
+          placeholder="Cari SPK / SO / MAP / Nama..."
+        />
+        <span class="pjw-lbl">DL</span>
+        <input v-model="filter.dlDari" type="date" class="pjw-date" />
+        <span class="pjw-sep">s/d</span>
+        <input v-model="filter.dlSampai" type="date" class="pjw-date" />
+        <span class="pjw-lbl ml-2">Kesepakatan</span>
+        <input
+          v-model="filter.kspDari"
+          type="date"
+          class="pjw-date"
+          :disabled="filter.kspKosong"
+        />
+        <span class="pjw-sep">s/d</span>
+        <input
+          v-model="filter.kspSampai"
+          type="date"
+          class="pjw-date"
+          :disabled="filter.kspKosong"
+        />
+        <label class="pjw-filter-chk">
+          <input v-model="filter.kspKosong" type="checkbox" />
+          Belum ada
+        </label>
+        <button
+          v-if="filterAktif"
+          type="button"
+          class="pjw-filter-reset"
+          @click="resetFilter"
+        >
+          Reset
+        </button>
+        <span v-if="filterAktif" class="pjw-sep">
+          {{ filteredDetail.length }} / {{ visibleDetail.length }} baris
+        </span>
+      </div>
+
       <div class="pjw-table-wrap">
         <table class="pjw-dt">
           <thead>
@@ -1630,7 +1739,7 @@ const rowClass = (d: DetailRow) => {
           </thead>
           <tbody>
             <tr
-              v-for="(d, idx) in visibleDetail"
+              v-for="(d, idx) in filteredDetail"
               :key="d.PjwdId ?? idx"
               :class="rowClass(d)"
             >
@@ -1654,7 +1763,17 @@ const rowClass = (d: DetailRow) => {
                     }
                   "
                 />
-                <div v-else>{{ d.Nama }}</div>
+                <div v-else>
+                  <a
+                    v-if="d.SpkRef"
+                    href="#"
+                    class="spk-link"
+                    :title="`Preview SPK ${d.SpkRef}`"
+                    @click.prevent="bukaPreviewSpk(d.SpkRef)"
+                    >{{ d.Nama }}</a
+                  >
+                  <template v-else>{{ d.Nama }}</template>
+                </div>
                 <span
                   class="sumber-badge"
                   :class="{
@@ -2222,6 +2341,8 @@ const rowClass = (d: DetailRow) => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <SpkPreviewModal v-model="showSpkPreview" :nomor="spkPreviewNomor" />
 </template>
 
 <style scoped>
@@ -2815,5 +2936,46 @@ const rowClass = (d: DetailRow) => {
 .bd-note {
   font-size: 11px;
   color: #777;
+}
+
+.pjw-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.pjw-filter-cari {
+  width: 220px;
+}
+.pjw-filter-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #333;
+  cursor: pointer;
+}
+.pjw-filter-reset {
+  border: 1px solid #bdbdbd;
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.spk-link {
+  color: #1565c0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.spk-link:hover {
+  color: #0d47a1;
 }
 </style>
