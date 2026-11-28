@@ -27,7 +27,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggalSingkat as formatTanggal } from "@/utils/dateFormat";
 import TanggalInput from "@/components/TanggalInput.vue";
-import SpkPreviewModal from "@/components/ppic/SpkPreviewModal.vue";
+import SpkPreviewModal from "./components/SpkPreviewModal.vue";
 
 const authStore = useAuthStore();
 const toast = useToast();
