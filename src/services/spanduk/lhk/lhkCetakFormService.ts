@@ -76,6 +76,7 @@ export interface InfoSpk {
   Panjang: number | null;
   Lebar: number | null;
   Kode_Bahan: string;
+  Is_Spk: boolean;
   Plangkan_Otomatis: boolean;
   Plangkan: number;
   Plangkan_Total: number;

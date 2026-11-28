@@ -383,7 +383,7 @@ const isiBarisDariSpk = async (
     row.jumlahOrder = num(info.Jumlah_Order);
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
-    isiKainDariSpk(info.Kode_Bahan);
+    isiKainDariSpk(info.Kode_Bahan, info.Is_Spk);
     row.plgOtomatis = info.Plangkan_Otomatis === true;
     row.jmlPlangkan = row.plgOtomatis ? num(info.Plangkan) : 0;
     row.plgInfo = row.plgOtomatis
@@ -480,11 +480,21 @@ const labelKain = (o: KainOption) =>
 const kainDipakaiBarisLain = (kode: string, idx: number) =>
   formData.value.kain.some((r, i) => i !== idx && r.kode === kode);
 
-// Kain otomatis dari bahan SPK (qty tetap diisi manual). Bahan yang tidak ada di
-// daftar kain aktif diabaikan: SPK lama tanpa bahan, MAP, atau bahan nonaktif.
-const isiKainDariSpk = (kode: string) => {
+// Kain otomatis dari bahan SPK (qty tetap diisi manual). Hanya SPK: bahannya
+// divalidasi saat SO ke SPK. MAP memakai input bebas marketing, jadi kain dipilih manual.
+const isiKainDariSpk = (kode: string, isSpk: boolean) => {
+  if (!isSpk) {
+    return;
+  }
+  if (!kode) {
+    toast.warning("SPK ini tidak punya kode bahan, pilih kain manual.");
+    return;
+  }
   const o = kainOpts.value.find((x) => x.Kode === kode);
-  if (!kode || !o) {
+  if (!o) {
+    toast.warning(
+      `Bahan ${kode} tidak ada di daftar kain aktif (kode SB, aktif). Cek master bahan atau pilih kain manual.`,
+    );
     return;
   }
   const kain = formData.value.kain;
@@ -823,7 +833,9 @@ const tutupSetelahSimpan = () => {
                   <th style="width: 90px" class="tr">Jml Order (pcs)</th>
                   <th style="width: 70px" class="tr">Panjang (m)</th>
                   <th style="width: 70px" class="tr">Lebar (m)</th>
-                  <th style="width: 90px" class="tr bg-yellow">J. Cetak (pcs)</th>
+                  <th style="width: 90px" class="tr bg-yellow">
+                    J. Cetak (pcs)
+                  </th>
                   <th style="width: 95px" class="tr bg-yellow">J. Plangkan</th>
                   <th style="width: 120px" class="tr">Output Produksi (m)</th>
                   <th style="width: 32px" class="tc"></th>
@@ -1108,8 +1120,8 @@ const tutupSetelahSimpan = () => {
           LHK Cetak <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
         <div v-if="menungguApproval" class="text-body-2 text-warning mb-2">
-          LHK ini menunggu approval SPV karena pemakaian kain melebihi
-          kebutuhan dan belum aktif sebelum disetujui.
+          LHK ini menunggu approval SPV karena pemakaian kain melebihi kebutuhan
+          dan belum aktif sebelum disetujui.
         </div>
         <div class="text-body-2 text-grey-darken-1">
           Mau input LHK Cetak baru?
