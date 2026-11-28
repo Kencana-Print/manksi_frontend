@@ -22,10 +22,24 @@ interface HeaderDef {
   fixed?: boolean;
 }
 
-// ── Filter: periode (tanggal PO, boleh kosong = semua) & jenis ──
+// ── Filter: periode (tanggal PO, default awal bulan s/d hari ini) & jenis ──
 const filterState = ref<Record<string, unknown>>({});
-const startDate = ref("");
-const endDate = ref("");
+const getToday = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+const getAwalBulan = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
+};
+
+const startDate = ref(getAwalBulan());
+const endDate = ref(getToday());
 const jenis = ref<PoOutstandingJenisFilter>("ALL");
 
 watch([startDate, endDate, jenis], () => {
@@ -264,6 +278,7 @@ const onExport = async () => {
 }
 .sisa-cell {
   font-weight: 700;
+  color: #cc0000;
 }
 .janji-telat {
   color: #cc0000;
