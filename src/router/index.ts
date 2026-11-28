@@ -8816,6 +8816,40 @@ const router = createRouter({
         menuId: "975",
       },
     },
+    {
+      path: "/laporan/pembelian/rekap-belum-realisasi",
+      name: "LaporanPembelianRekapBelumRealisasi",
+      component: () =>
+        import("@/views/laporan/pembelian/RekapBelumRealisasiView.vue"),
+      meta: {
+        title: "Rekap Pembayaran Belum Realisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "975",
+      },
+    },
+    {
+      path: "/laporan/pembelian/kartu-hutang",
+      name: "LaporanPembelianKartuHutang",
+      component: () => import("@/views/laporan/pembelian/KartuHutangView.vue"),
+      meta: {
+        title: "Kartu Hutang per Supplier",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "975",
+      },
+    },
+    {
+      path: "/laporan/pembelian/rekap-hutang",
+      name: "LaporanPembelianRekapHutang",
+      component: () => import("@/views/laporan/pembelian/RekapHutangView.vue"),
+      meta: {
+        title: "Rekap Hutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "975",
+      },
+    },
 
     // ── Tools ───────────────────────────────────────────────────
     {

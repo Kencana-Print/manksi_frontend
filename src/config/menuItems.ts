@@ -2465,6 +2465,21 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/pembelian/po-outstanding",
               icon: IconClipboardList,
             },
+            {
+              title: "Rekap Belum Realisasi",
+              to: "/laporan/pembelian/rekap-belum-realisasi",
+              icon: IconReceipt2,
+            },
+            {
+              title: "Kartu Hutang",
+              to: "/laporan/pembelian/kartu-hutang",
+              icon: IconFileDescription,
+            },
+            {
+              title: "Rekap Hutang",
+              to: "/laporan/pembelian/rekap-hutang",
+              icon: IconFileAnalytics,
+            },
           ],
         },
       ],
