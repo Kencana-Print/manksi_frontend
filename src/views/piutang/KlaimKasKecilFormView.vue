@@ -610,12 +610,13 @@ const validateSave = () => {
               diklaim yang bisa dipilih.
             </div>
             <div v-else-if="isPc" class="kk-hint">
-              BKK penyelesaian dana belanja diklaim utuh. Klaim ini dibayar
-              lewat BBK dari bank, bukan lewat Pengajuan Transfer.
+              BKK penyelesaian dana belanja atau BKK manual dari laci diklaim
+              utuh. Klaim ini dibayar lewat BBK dari bank, bukan lewat Pengajuan
+              Transfer.
             </div>
             <div v-else class="kk-hint">
-              BKK diklaim utuh. Hanya BKK penyelesaian kas yang sudah selesai
-              dan belum diklaim yang bisa dipilih.
+              BKK diklaim utuh. BKK penyelesaian kas maupun BKK manual (tanpa
+              kasbon) yang belum diklaim bisa dipilih.
             </div>
             <div class="kk-ringkas-row kk-ringkas-total">
               <span>Total Klaim</span><b>{{ numFmt(total) }}</b>
@@ -646,8 +647,8 @@ const validateSave = () => {
           yang bisa dipilih.
         </span>
         <span v-else class="kk-hint">
-          BKK diklaim utuh. Hanya BKK yang sudah selesai dan belum diklaim yang
-          bisa dipilih.
+          BKK diklaim utuh. BKK penyelesaian kas atau BKK manual yang belum
+          diklaim bisa dipilih.
         </span>
       </div>
 
